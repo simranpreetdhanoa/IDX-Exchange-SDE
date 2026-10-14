@@ -169,4 +169,29 @@ router.get('/:id/openhouses', validateListingId, async (req, res) => {
   }
 });
 
+// GET /api/properties/:id — one full property (Week 4)
+router.get('/:id', validateListingId, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // LIMIT 1: three listing IDs appear twice in rets_property (identical copies)
+    const [rows] = await pool.query(
+      'SELECT * FROM rets_property WHERE L_ListingID = ? LIMIT 1',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        error: `No property found with listing ID ${id}. Check the ID and try again.`
+      });
+    }
+
+    return res.status(200).json(rows[0]);
+
+  } catch (error) {
+    console.error('Property detail endpoint error:', error);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 module.exports = router;
