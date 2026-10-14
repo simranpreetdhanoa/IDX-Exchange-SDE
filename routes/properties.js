@@ -2,6 +2,20 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db'); // Connection pool created in Week 2
 
+// (week 4) Id validation
+// Listing IDs are digits only (9–10 in our data); allow up to 20 so longer future IDs still work (week 4)
+function validateListingId(req, res, next) {
+  const { id } = req.params;
+
+  if (!/^\d{1,20}$/.test(id)) {
+    return res.status(400).json({
+      error: 'Invalid listing ID. It must contain only digits (max 20 characters).'
+    });
+  }
+
+  next();
+}
+
 router.get('/', async (req, res) => {
   try {
     const { city, zipcode, minPrice, maxPrice, beds, baths, limit = 20, offset = 0 } = req.query;
