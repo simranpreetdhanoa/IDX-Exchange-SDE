@@ -43,7 +43,7 @@ A robust backend REST API and optimized database architecture for real estate pr
 #### Terminal & SQL Commands:
 ```bash
 # Start MySQL Docker container
-docker run --name idx-mysql-local -e MYSQL_ROOT_PASSWORD=root -p 3306:3306 -d mysql:8.0
+docker run --name idx-mysql-local -e MYSQL_ROOT_PASSWORD=<your-password> -p 3306:3306 -d mysql:8.0
 
 # Connect to containerized MySQL interactive shell
 docker exec -it idx-mysql-local mysql -u root -p
