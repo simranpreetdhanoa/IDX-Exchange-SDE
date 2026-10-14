@@ -139,4 +139,34 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/properties/:id/openhouses — open houses for one property (Week 4)
+// Registered before /:id (step 4) — see week-4.md "route order"
+router.get('/:id/openhouses', validateListingId, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Make sure the property exists
+    const [properties] = await pool.query(
+      'SELECT L_ListingID FROM rets_property WHERE L_ListingID = ? LIMIT 1',
+      [id]
+    );
+
+    if (properties.length === 0) {
+      return res.status(404).json({ error: `No property found with listing ID ${id}` });
+    }
+
+    // 2. Get its open houses, earliest first
+    const [openHouses] = await pool.query(
+      'SELECT * FROM rets_openhouse WHERE L_ListingID = ? ORDER BY OH_StartDate, OH_StartTime',
+      [id]
+    );
+
+    return res.status(200).json(openHouses);
+
+  } catch (error) {
+    console.error('Open houses endpoint error:', error);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 module.exports = router;
