@@ -5,16 +5,30 @@ Welcome to my IDX Real Estate project! Here is my progress week by week:
 ## 🟢 Week 1: Database Setup
 - Set up MySQL database in Docker.
 - Configured connection pool (`db.js`).
+- 📖 Details: [docs/week-1.md](docs/week-1.md)
 
 ## 🟢 Week 2: Express Server & Health Check
 - Created the Express server in `server.js`.
 - Built the `/api/health` endpoint to check if the database is connected.
+- 📖 Details: [docs/week-2.md](docs/week-2.md)
 
 ## 🟢 Week 3: Property Search & Performance
 - Built `GET /api/properties` route with search filters (`city`, `minPrice`, `beds`, etc.).
 - Added server-side pagination (`limit` and `offset`).
 - Added input validation for `400 Bad Request` errors.
 - Created database indexes on `rets_property` table and tested with `EXPLAIN`.
+- 📖 Details: [docs/week-3.md](docs/week-3.md)
+
+## 🟢 Week 4: Property Detail & Open House Endpoints
+- Added request logging middleware (method, URL, status code, duration).
+- Built `GET /api/properties/:id` (one property or 404) and `GET /api/properties/:id/openhouses` (sorted list, `[]` if none).
+- Validated listing IDs (digits only, max 20 → otherwise 400).
+- Tested route order in Express and documented why it matters.
+- Debug challenge: orphan open houses; added a global error handler.
+- 📖 Details: [docs/week-4.md](docs/week-4.md)
+
+---
+
 # IDX Real Estate Platform (SDE)
 
 Backend API service and database optimization project for real estate property search and RETS data indexing.
