@@ -61,12 +61,15 @@ docker run --name idx-mysql-local -e MYSQL_ROOT_PASSWORD=<your-password> -p 3306
 
 # Connect to containerized MySQL interactive shell
 docker exec -it idx-mysql-local mysql -u root -p
-**-- Database creation and verification
+```
 
-**CREATE DATABASE IF NOT EXISTS rets;
+```sql
+-- Database creation and verification
+CREATE DATABASE IF NOT EXISTS rets;
 USE rets;
 SHOW TABLES;
-**
+```
+
 ---
 
 ### 🟢 Week 2: Express Server & Health Check Endpoint
@@ -92,6 +95,9 @@ npm install --save-dev nodemon
 
 # Execute backend development server
 npm run dev
+```
+
+---
 
 # 🟢 Week 3: Property Search API, Pagination, Input Validation & Indexing
 
@@ -144,5 +150,4 @@ SHOW INDEXES FROM rets_property;
 
 -- Verify query optimization performance (check key column is NOT NULL)
 EXPLAIN SELECT * FROM rets_property WHERE LOWER(TRIM(L_City)) = 'irvine' AND L_SystemPrice >= 300000;
-
-  
+```
