@@ -46,6 +46,13 @@ app.use((req, res) => {
   });
 });
 
+// Global error handler (Week 4): last safety net for any error a route didn't catch
+app.use((err, req, res, next) => {
+  const status = err.status || 500;   // use the error's own status (e.g. 400), otherwise 500
+  console.error(`Unhandled error on ${req.method} ${req.originalUrl}:`, err);
+  res.status(status).json({ error: status === 500 ? 'Internal Server Error' : 'Bad request' });
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server listening on http://localhost:${PORT}`);
