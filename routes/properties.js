@@ -2,6 +2,20 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db'); // Connection pool created in Week 2
 
+// (week 4) Id validation
+// Listing IDs are digits only (9–10 in our data); allow up to 20 so longer future IDs still work (week 4)
+function validateListingId(req, res, next) {
+  const { id } = req.params;
+
+  if (!/^\d{1,20}$/.test(id)) {
+    return res.status(400).json({
+      error: 'Invalid listing ID. It must contain only digits (max 20 characters).'
+    });
+  }
+
+  next();
+}
+
 router.get('/', async (req, res) => {
   try {
     const { city, zipcode, minPrice, maxPrice, beds, baths, limit = 20, offset = 0 } = req.query;
@@ -121,6 +135,61 @@ router.get('/', async (req, res) => {
 
   } catch (error) {
     console.error('Property endpoint error:', error);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// GET /api/properties/:id/openhouses — open houses for one property (Week 4)
+// Registered before /:id (step 4) — see week-4.md "route order"
+router.get('/:id/openhouses', validateListingId, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Make sure the property exists
+    const [properties] = await pool.query(
+      'SELECT L_ListingID FROM rets_property WHERE L_ListingID = ? LIMIT 1',
+      [id]
+    );
+
+    if (properties.length === 0) {
+      return res.status(404).json({ error: `No property found with listing ID ${id}` });
+    }
+
+    // 2. Get its open houses, earliest first
+    const [openHouses] = await pool.query(
+      'SELECT * FROM rets_openhouse WHERE L_ListingID = ? ORDER BY OH_StartDate, OH_StartTime',
+      [id]
+    );
+
+    return res.status(200).json(openHouses);
+
+  } catch (error) {
+    console.error('Open houses endpoint error:', error);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// GET /api/properties/:id — one full property (Week 4)
+router.get('/:id', validateListingId, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // LIMIT 1: three listing IDs appear twice in rets_property (identical copies)
+    const [rows] = await pool.query(
+      'SELECT * FROM rets_property WHERE L_ListingID = ? LIMIT 1',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        error: `No property found with listing ID ${id}. Check the ID and try again.`
+      });
+    }
+
+    return res.status(200).json(rows[0]);
+
+  } catch (error) {
+    console.error('Property detail endpoint error:', error);
     return res.status(500).json({ error: 'Internal Server Error' });
   }
 });
