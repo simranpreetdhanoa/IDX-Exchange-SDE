@@ -1,6 +1,6 @@
 # Week 5 — React Frontend: Property Grid
 
-> 🚧 In progress — Steps 0, 1 and 2 done. See "Where we are" below.
+> 🚧 In progress — Steps 0–3 done (debug challenge solved). See "Where we are" below.
 
 ## Goal
 A React frontend that fetches properties from my Express API and shows them as a
@@ -21,7 +21,7 @@ first photo from `L_Photos` · loading state · error message if backend unreach
 
 **Debug challenge:** images are broken for some properties. Is `L_Photos` always a
 valid JSON array? What does it contain when there are no photos? Write code that
-never crashes. *(Not started — hints only.)*
+never crashes. *(Solved in Step 3 — see below.)*
 
 ---
 
@@ -33,9 +33,9 @@ never crashes. *(Not started — hints only.)*
 | — | Restructure the repo (R1–R8) | ✅ Done — PR #4 merged |
 | 0 | Get `frontend/` into git | ✅ Done — commit `b193b17` |
 | 1 | Port 3000 + proxy | ✅ Done — commit `626d698` |
-| 2 | API client `src/api/client.js` | ✅ Done — 9/9 tests pass |
-| 3 | Debug challenge: investigate `L_Photos` | ⏳ Next |
-| 4 | Helper functions `src/utils/property.js` | ⏳ |
+| 2 | API client `src/api/client.js` | ✅ Done — commit `790e5ac`, 9/9 tests pass |
+| 3 | Debug challenge: investigate `L_Photos` | ✅ Solved — 211 `""` → crash; 404/PDF photos → broken image |
+| 4 | Helper functions `src/utils/property.js` | ⏳ Next |
 | 5 | `PropertyCard` component | ⏳ |
 | 6 | `ListingsPage` component | ⏳ |
 | 7 | Hook it up in `App.jsx` | ⏳ |
@@ -393,6 +393,115 @@ saved for Step 8.
 
 ---
 
+## Step 3 — Debug challenge 🐛 ✅ (`L_Photos`)
+
+> *Images are broken for some properties but not others. Is `L_Photos` always a valid
+> JSON array? What does it contain for properties with no photos? Write defensive
+> code that never crashes.*
+
+**Defensive code** = code that expects bad input and handles it calmly instead of
+crashing. Like a seatbelt — you assume something *might* go wrong.
+
+No project files changed in this step — all checks were throwaway scripts.
+
+### The detective trail (hints → what I did → what I found)
+
+**Hint 1 — one example can't speak for 55,212 rows.**
+My idea: group the values and count each.
+```sql
+SELECT L_Photos, COUNT(*) AS how_many
+FROM rets_property
+GROUP BY L_Photos
+ORDER BY how_many DESC
+LIMIT 10;
+```
+Result: 54,999 different values (almost every house has its own unique list). Repeated
+values rise to the top:
+```
+how_many | L_Photos
+     211 | ""                      ← an EMPTY STRING, not a JSON array
+       2 | ["https://...1178234327...   ← the 3 duplicate listings from Week 4
+       1 | ["https://...
+```
+
+**Hint 2 — what does the code do with `""`?** I predicted, then we ran it:
+```
+JSON.parse("")  →  SyntaxError: Unexpected end of JSON input
+```
+It **throws**. In React, an error while drawing a component removes the **whole app**
+→ a **blank white page**. One bad house out of 20 would wipe out every card.
+(Same lesson as Week 4's `rows[0].L_Address`: the code *assumed* data was there.)
+
+**Hint 3 — GROUP BY can't show a broken value that appears only once.**
+My idea: loop through every row and try `JSON.parse` on each one. Result for all 55,212:
+
+| Count | Group |
+|---|---|
+| 54,751 | Valid array, first photo `https://` on `api.cotality.com` |
+| 250 | Valid array, first photo `https://` on `api-trestle.corelogic.com` |
+| 211 | Empty string `""` |
+| 0 | `NULL`, broken JSON, not an array, `[]`, first item not text / not a URL |
+
+"0 today" ≠ "impossible tomorrow" — the data comes from an outside feed.
+
+**Hint 4 — a valid URL can still fail.** Like an address written perfectly on an
+envelope, but the building was knocked down. To check: request it and read the status code.
+I tested 1 URL from each website: both answered **302** (redirect = "moved, go here
+instead") → `media.crmls.org` → **200**. Both worked.
+
+**Hint 5 — one example per group isn't enough.** My idea: test more.
+Tested **all 250** corelogic URLs and a **random sample of 250** cotality URLs
+(a random sample is like a taste test — 250 random spoonfuls tell you about the pot):
+
+| Group | Final answer | Count | What it really is |
+|---|---|---|---|
+| corelogic | 200 `image/jpeg` | 234 | Real photo |
+| corelogic | **404 Not Found** | **16** | Nothing there |
+| cotality | 200 `image/jpeg` | 235 | Real photo |
+| cotality | 200 **`application/pdf`** | **11** | A **PDF document**, not a photo |
+| cotality | 200 `text/plain` | 4 | Wrong label — `file` says it's really a JPEG |
+
+**Content type** = the label a server puts on what it sends (like a parcel label).
+The `file` command ignores the label and looks inside.
+
+**Last check — what does `<img>` show?** My guess: 404 and PDF broken, mislabelled
+JPEG shows. Tested in headless Chrome:
+
+| Photo | Result |
+|---|---|
+| Normal | ✅ shown (1024 × 683) |
+| Mislabelled JPEG | ✅ shown — browsers look inside images, not at the label |
+| 404 | ❌ broken — `onerror` fired |
+| PDF | ❌ broken — `onerror` fired |
+
+**`onerror`** = an **event** (a signal from the browser) that an `<img>` fires when it
+can't show the picture.
+
+### The answer
+**Is `L_Photos` always a valid JSON array?** No. **With no photos it contains an empty
+string `""`** (211 properties). There are two different problems:
+
+| Kind | What | How many | Without protection |
+|---|---|---|---|
+| **A. Bad data** | `L_Photos` = `""` | 211 of 55,212 | `JSON.parse` throws → **whole page blank** |
+| **B. Bad picture** | Valid URL → 404 or PDF | ~6% of corelogic, ~4% of cotality tested | **Broken-image icon** on that card |
+
+### The fix (built in Step 4)
+| Problem | Protection | Comparison |
+|---|---|---|
+| A. Bad data | `try/catch` around `JSON.parse` → "no photo" instead of a crash | Seatbelt |
+| A+. Parses but isn't a photo list (`null`, `{}`) | Check `Array.isArray` and that the first item is text | `try/catch` only helps when something **throws** |
+| B. Bad picture | `onError` on `<img>` → swap to a placeholder | A spare picture for the frame |
+| No photo | Show the placeholder straight away | |
+
+### Check questions
+- **Q:** What is in `L_Photos` for the top GROUP BY row? **A:** An empty string — not a valid array.
+- **Q:** `JSON.parse("")` returns `[]`, `null`, throws, or `""`? **A:** It **throws** → the page crashes.
+- **Q:** Will `<img>` show the 404, the PDF, the mislabelled JPEG? **A:** 404 ❌, PDF ❌, JPEG ✅.
+- **Q:** Two protections? **A:** `try/catch` around `JSON.parse`; a placeholder when the image fails.
+
+---
+
 ## Problems we hit
 | Problem | Cause | Fix / lesson |
 |---|---|---|
@@ -433,12 +542,22 @@ saved for Step 8.
   For 404/500 you must check `response.ok`.
 - **How do you tell "backend down" from a normal 500?** Through the proxy, "backend
   down" is a 5xx with no JSON body; my Express 500s always have a JSON `error`.
+- **What was special about the broken images?** Two things: 211 properties have
+  `L_Photos = ""` (crashes `JSON.parse`), and some valid URLs lead to a 404 or a PDF.
+- **How did you find them?** GROUP BY + COUNT, then a check of all 55,212 rows, then
+  500 photo URLs with curl, then a real browser test.
+- **Why handle cases that aren't in the data (NULL, broken JSON)?** The data comes from
+  an outside feed and can change; "never crash" means handling any value.
+- **Why test a random sample instead of all 54,751 URLs?** Faster, and it doesn't
+  hammer someone else's server; a random sample still shows the pattern.
+- **Why does a JPEG labelled `text/plain` still show?** Browsers check the file
+  itself for images, not the label.
 
 ---
 
 ## Still to do / ask
 - Step 8: test "Cannot reach the backend" (stop the backend — ask first).
 - Confirm which column holds square feet (`LM_Int2_3` looks likely, e.g. 3,677).
-- Debug challenge (`L_Photos`).
+- Data issue to report: ~4–6% of tested photo URLs are 404s or PDFs (from the MLS feed).
 - Update `CLAUDE.md` paths: notes are now in `docs/week-N.md`, README is `README.md`
   (no longer `backend/...`).
