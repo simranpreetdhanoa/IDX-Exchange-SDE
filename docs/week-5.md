@@ -1,6 +1,6 @@
 # Week 5 — React Frontend: Property Grid
 
-> 🚧 In progress — Steps 0–6 done (debug challenge solved). See "Where we are" below.
+> 🚧 In progress — Steps 0–7 done: the property grid works in the browser. See "Where we are" below.
 
 ## Goal
 A React frontend that fetches properties from my Express API and shows them as a
@@ -37,9 +37,9 @@ never crashes. *(Solved in Step 3 — see below.)*
 | 3 | Debug challenge: investigate `L_Photos` | ✅ Solved — commit `4a32c89`; 211 `""` → crash; 404/PDF photos → broken image |
 | 4 | Helper functions `src/utils/property.js` | ✅ Done — commit `35e144a`; 39/39 edge cases, 0 crashes on 55,212 rows |
 | 5 | `PropertyCard` component | ✅ Done — commit `85a16e8`; 3/3 render tests (hover + `onError` checked in Step 8) |
-| 6 | `ListingsPage` component | ✅ Done — starts in "Loading…", lint clean (real data checked in Step 7) |
-| 7 | Hook it up in `App.jsx` | ⏳ Next |
-| 8 | Full acceptance check | ⏳ |
+| 6 | `ListingsPage` component | ✅ Done — commit `4080e24`; starts in "Loading…", lint clean |
+| 7 | Hook it up in `App.jsx` | ✅ Done — 20 real cards, "Showing 20 of 55,212", 0 console errors |
+| 8 | Full acceptance check | ⏳ Next |
 | 9 | Notes + PR | ⏳ |
 
 ---
@@ -888,6 +888,94 @@ Comparison: a waiter who, every time food arrives, goes back to order the same f
 
 ---
 
+## Step 7 — Hook it up ✅ (`App.jsx`, `App.css`, `index.css`)
+
+### What & why
+The browser still showed the **old** 369-line `App.jsx`. Swapped it for `ListingsPage`.
+Before changing anything I checked the two style files — both would have got in the way:
+- **`App.css`** — styles for the old page only (`.header`, `.health-badge`, `.card`…).
+- **`index.css`** — Vite's starter template. It **centres all text** (`#root { text-align: center }`)
+  and switches to a **dark background** in dark mode while my title is dark text → unreadable.
+
+### The 3 changes
+**1. `App.jsx`** — 369 lines → 5:
+```jsx
+import ListingsPage from './pages/ListingsPage';
+
+// Week 5: the app is the listings page (the old all-in-one version is in git history, commit b193b17)
+export default function App() {
+  return <ListingsPage />;
+}
+```
+**2. `App.css`** — deleted (`git rm`); old styles stay in git history.
+
+**3. `index.css`** — 111-line template → small global styles:
+```css
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background: #f8fafc;
+  color: #1e293b;
+}
+```
+| Code | Plain English |
+|---|---|
+| `return <ListingsPage />` | `App` is the top brick; it now just shows the listings page |
+| `box-sizing: border-box` | Widths include padding and border, so `width: 100%` really fits. `*` = every element. A common first line in most websites' CSS. |
+| `body { … }` | Page-wide basics: no gap at the edges, clean font, light grey background, dark text |
+
+`main.jsx` wasn't touched — it already loads `index.css` and `App`.
+
+### Test — in a real browser (headless Chrome)
+| Check | Result |
+|---|---|
+| Title | ✅ "Properties for sale" |
+| Count | ✅ **"Showing 20 of 55,212 properties"** |
+| Cards | ✅ **20** from MySQL, e.g. `$3,950,000 · 1461 Laurel Way · Beverly Hills, CA · 4 beds · 5 baths · 3,677 sqft` |
+| All 7 items | ✅ 20 of 20 cards have price, address, city/state, beds, baths, sqft + photo or placeholder |
+| Photos | ✅ 19 real photos + 1 placeholder |
+| Debug challenge, live | ✅ The placeholder card is **582 Pasture Ave** (`1118398412`) — `L_Photos = ""`, one of the 211. The rest of its card shows normally — no blank page. |
+| Loading / error | ✅ "Loading…" gone; 0 error boxes |
+| Browser console | ✅ no errors (only Vite "connected" and React DevTools tip) |
+| Lint | ✅ no problems |
+
+Screenshot: a 4-column grid of white cards with photos, prices in bold, address,
+city/state and "beds · baths · sqft" — the second card shows the grey
+"No photo available" box.
+
+**False alarm:** my first check said "error shown: True". In development, Vite puts the
+CSS **inside** the page, so the class name `listings-error` appeared in the styles —
+not as an error box. Re-checked for the box itself (`role="alert"`): **0**.
+Lesson: when a test result contradicts what you see, check the test.
+
+**Two requests per page load:** the backend log shows `GET /api/properties?limit=20`
+**twice**. That's React **StrictMode** (in `main.jsx`): in development only, it runs
+effects twice on purpose to help catch bugs. A deployed site fetches once.
+
+**Noticed (not failures):**
+- `1 baths` (6577 Morongo Road) — should be "1 bath"; small grammar fix for later.
+- `13 beds · 20 baths · 34,143 sqft` for $28,888,000 — real data (a Palos Verdes mansion), not a bug.
+
+### What I learned: protection A vs B
+| | Protection A | Protection B |
+|---|---|---|
+| When | **Before** drawing — `getFirstPhoto` returns `null` | **After** trying — `<img>` fails, `onError` fires |
+| Cause | Bad **data** (`L_Photos = ""`) | Bad **picture** (404, PDF) |
+| `<img>` in the page? | **No** | Yes at first, then swapped |
+| Example | 582 Pasture Ave (seen in Step 7) | To test in Step 8 |
+
+### Check question
+**Q:** 582 Pasture Ave shows "No photo available". Protection A or B?
+**A:** **A** — `L_Photos` is empty, so `getFirstPhoto` returns `null`. Proof: no `<img>` tag at all on that card.
+
+---
+
 ## Problems we hit
 | Problem | Cause | Fix / lesson |
 |---|---|---|
@@ -954,11 +1042,17 @@ Comparison: a waiter who, every time food arrives, goes back to order the same f
 - **Why does each card need a `key`, and why `id` and not `L_ListingID`?** React uses
   keys to track list items between redraws; they must be unique, and 3 listing IDs
   appear twice in the data.
+- **Why does the backend log show two requests per page load?** React StrictMode runs
+  effects twice in development to help find bugs; production fetches once.
+- **Why did you replace `index.css`?** It was Vite's template: it centred all text and
+  made the title unreadable in dark mode.
 
 ---
 
 ## Still to do / ask
-- Step 8: test "Cannot reach the backend" (stop the backend — ask first).
+- Step 8: test "Cannot reach the backend" (stop the backend — ask first), hover, and the `onError` swap.
+- Optional: "1 baths" → "1 bath", "1 beds" → "1 bed".
+- Optional clean-up: unused `lucide-react` package and template images (`hero.png`, logo `.svg`s).
 - 7 listings store living area in square meters (`LivingAreaUnits`) — shown as sqft for now.
 - Data issue to report: ~4–6% of tested photo URLs are 404s or PDFs (from the MLS feed).
 - Update `CLAUDE.md` paths: notes are now in `docs/week-N.md`, README is `README.md`
