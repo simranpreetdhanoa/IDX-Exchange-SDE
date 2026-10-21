@@ -1,7 +1,7 @@
 # 🏠 IDX Real Estate Platform
 
 A Zillow/Redfin-style property search app built on real MLS (Multiple Listing Service) data.
-This repository contains the **backend**: a REST API that lets you search California property
+This repository contains the **backend** (in the `backend/` folder): a REST API that lets you search California property
 listings by city, ZIP code, price, bedrooms and bathrooms, view a single property, and see its
 upcoming open houses.
 
@@ -33,7 +33,7 @@ upcoming open houses.
 ```
 ┌──────────────────────┐   HTTP (JSON)   ┌──────────────────────┐   SQL    ┌──────────────────────┐
 │   React frontend     │ ──────────────▶ │     Express API      │ ───────▶ │   MySQL in Docker    │
-│   (Vite dev server)  │ ◀────────────── │  (this repository)   │ ◀─────── │  container:          │
+│   (Vite dev server)  │ ◀────────────── │     (backend/)       │ ◀─────── │  container:          │
 │   localhost:5173     │                 │   localhost:5000     │          │  idx-mysql-local     │
 └──────────────────────┘                 └──────────────────────┘          │  localhost:3306      │
                                                                            │  database: rets      │
@@ -48,15 +48,18 @@ only part that knows the database password, checks every request, and decides wh
 ### Project structure
 ```
 .
-├── server.js            # Starts Express: request logger, CORS, routes, 404 and error handlers
-├── db.js                # MySQL connection pool (reads settings from .env)
-├── routes/
-│   └── properties.js    # /api/properties endpoints + listing ID validation
-├── sql/
-│   └── indexes.sql      # Database indexes for fast searching
-├── docs/                # Weekly notes (week-1.md … week-4.md) and milestone-log.md
-├── .env.example         # Template for your .env file (placeholders only)
-└── package.json
+├── backend/
+│   ├── server.js            # Starts Express: request logger, CORS, routes, 404 and error handlers
+│   ├── db.js                # MySQL connection pool (reads settings from .env)
+│   ├── routes/
+│   │   └── properties.js    # /api/properties endpoints + listing ID validation
+│   ├── sql/
+│   │   └── indexes.sql      # Database indexes for fast searching
+│   ├── .env.example         # Template for your .env file (placeholders only)
+│   └── package.json
+├── docs/                    # Weekly notes (week-1.md … week-4.md) and milestone-log.md
+├── README.md
+└── .gitignore               # Keeps .env and node_modules out of git (for every folder)
 ```
 
 ---
@@ -71,7 +74,7 @@ only part that knows the database password, checks every request, and decides wh
 ### 2. Get the code and install packages
 ```bash
 git clone https://github.com/simranpreetdhanoa/IDX-Exchange-SDE.git
-cd IDX-Exchange-SDE
+cd IDX-Exchange-SDE/backend
 npm install
 ```
 
@@ -108,18 +111,20 @@ Then run:
 ```sql
 SET SESSION sql_mode = '';
 ```
-and paste the `CREATE INDEX` statements from [`sql/indexes.sql`](sql/indexes.sql), **removing the words
+and paste the `CREATE INDEX` statements from [`backend/sql/indexes.sql`](backend/sql/indexes.sql), **removing the words
 `IF NOT EXISTS`** from each one. Type `exit` when done.
 > Why: MySQL 8 rejects `CREATE INDEX IF NOT EXISTS`, and its strict mode rejects some old column
 > defaults in the imported table (Error 1067). See [Known issues](#-known-issues-and-future-improvements).
 
 ### 6. Create your `.env` file
+Still inside the `backend/` folder:
 ```bash
 cp .env.example .env
 ```
-Open `.env` and set `DB_PASSWORD` to the password from step 3. **Never commit `.env`** — it is listed in `.gitignore`.
+Open `backend/.env` and set `DB_PASSWORD` to the password from step 3. **Never commit `.env`** — it is listed in `.gitignore`.
 
 ### 7. Run the API
+From the `backend/` folder:
 ```bash
 npm run dev
 ```
@@ -281,7 +286,7 @@ The detailed command log from Weeks 1–3 is in [docs/milestone-log.md](docs/mil
 - **Frontend not yet connected:** the React app (not in this repo yet) expects an older response
   format (`{ success, data }`), sends `page`/`bedrooms` instead of `offset`/`beds`, and opens
   properties by the internal `id` instead of `L_ListingID`.
-- **`sql/indexes.sql` doesn't run as-is on MySQL 8:** it uses `CREATE INDEX IF NOT EXISTS` and doesn't
+- **`backend/sql/indexes.sql` doesn't run as-is on MySQL 8:** it uses `CREATE INDEX IF NOT EXISTS` and doesn't
   turn off strict mode first (see setup step 5 for the workaround).
 - **Dates** come back as UTC timestamps (e.g. `2026-09-20T07:00:00.000Z`) instead of plain dates.
 - **Data quality:** ~1,300 open houses point to properties that don't exist ("orphans"), and 3 listing
@@ -291,7 +296,7 @@ The detailed command log from Weeks 1–3 is in [docs/milestone-log.md](docs/mil
 - Error responses use slightly different shapes across endpoints.
 
 **Future improvements**
-- Fix `sql/indexes.sql` so it runs on MySQL 8 without edits.
+- Fix `backend/sql/indexes.sql` so it runs on MySQL 8 without edits.
 - Return plain dates (`dateStrings` option in `db.js`).
 - Clean up orphan open houses and duplicates, convert `rets_openhouse` to InnoDB, add a foreign key.
 - Use one consistent error format and hide internal error details in `/api/health`.
