@@ -1,15 +1,17 @@
 # 🏠 IDX Real Estate Platform
 
 A Zillow/Redfin-style property search app built on real MLS (Multiple Listing Service) data.
-This repository contains the **backend** (in the `backend/` folder): a REST API that lets you search California property
-listings by city, ZIP code, price, bedrooms and bathrooms, view a single property, and see its
-upcoming open houses.
+This repository contains:
+- the **backend** (in `backend/`): a REST API that lets you search California property listings by
+  city, ZIP code, price, bedrooms and bathrooms, view a single property, and see its upcoming open houses
+- the **frontend** (in `frontend/`): a React app that shows the listings as a grid of property cards
 
 ---
 
 ## 📸 Screenshot
 
-> Screenshot coming soon — the React frontend is still being built.
+![Property grid](docs/images/listings-grid.png)
+*The listings page: 20 property cards with photo, price, address, city/state, beds, baths and sqft.*
 
 ---
 
@@ -24,7 +26,7 @@ upcoming open houses.
 | Cross-origin requests | cors | 2.8.6 |
 | Dev auto-restart | nodemon | 1.14.10 |
 | Database | MySQL (Docker image `mysql:8`) | 8.4.11 |
-| Frontend *(in progress, not in this repo yet)* | React + Vite | React 19.3.0, Vite 8.3.3 |
+| Frontend | React (run with Vite) | React 19.3.0, Vite 8.3.3 |
 
 ---
 
@@ -34,7 +36,7 @@ upcoming open houses.
 ┌──────────────────────┐   HTTP (JSON)   ┌──────────────────────┐   SQL    ┌──────────────────────┐
 │   React frontend     │ ──────────────▶ │     Express API      │ ───────▶ │   MySQL in Docker    │
 │   (Vite dev server)  │ ◀────────────── │     (backend/)       │ ◀─────── │  container:          │
-│   localhost:5173     │                 │   localhost:5000     │          │  idx-mysql-local     │
+│   localhost:3000     │                 │   localhost:5000     │          │  idx-mysql-local     │
 └──────────────────────┘                 └──────────────────────┘          │  localhost:3306      │
                                                                            │  database: rets      │
                                                                            └──────────────────────┘
@@ -43,7 +45,10 @@ upcoming open houses.
 **The React app never talks to MySQL directly.** It only calls the Express API. The API is the
 only part that knows the database password, checks every request, and decides which data to send back.
 
-> Note: Vite's default port is 5173 (some guides show 3000 for React).
+> The frontend runs on port 3000 (set in `frontend/vite.config.js`; Vite's default is 5173).
+> Its dev server forwards every `/api/...` request to `http://localhost:5000` (a **proxy**), so the
+> React code only calls `/api/...`. The guide's `"proxy"` line in `package.json` is for Create React App;
+> Vite ignores it.
 
 ### Project structure
 ```
@@ -57,7 +62,17 @@ only part that knows the database password, checks every request, and decides wh
 │   │   └── indexes.sql      # Database indexes for fast searching
 │   ├── .env.example         # Template for your .env file (placeholders only)
 │   └── package.json
-├── docs/                    # Weekly notes (week-1.md … week-4.md) and milestone-log.md
+├── frontend/
+│   ├── src/
+│   │   ├── api/client.js                # All calls to the backend; throws clear errors
+│   │   ├── utils/property.js            # Safe formatting + photo parsing (never crashes)
+│   │   ├── components/PropertyCard.jsx  # One property card (+ .css: hover effect)
+│   │   ├── pages/ListingsPage.jsx       # Fetches listings; loading, error, count, grid
+│   │   ├── App.jsx                      # Shows ListingsPage
+│   │   └── main.jsx                     # Starts React
+│   ├── vite.config.js                   # Port 3000 + /api proxy
+│   └── package.json
+├── docs/                    # Weekly notes (week-1.md … week-5.md), milestone-log.md, images/
 ├── README.md
 └── .gitignore               # Keeps .env and node_modules out of git (for every folder)
 ```
@@ -135,6 +150,16 @@ curl http://localhost:5000/api/health
 ```
 Every request is logged in the first terminal, e.g.
 `[2026-10-14T10:23:25.721Z] GET /api/health 200 - 26ms`. Stop the server with `Ctrl + C`.
+
+### 8. Run the frontend
+Keep the API running, and in a **new terminal**:
+```bash
+cd IDX-Exchange-SDE/frontend
+npm install
+npm run dev
+```
+Open **http://localhost:3000**. You should see "Showing 20 of 55,212 properties" and a grid of cards.
+If the API isn't running, the page shows: *"Couldn't load properties. Cannot reach the backend…"*
 
 ---
 
@@ -267,7 +292,7 @@ values; there is **no foreign key** enforcing it (see Known issues).
 - [x] **Week 2** — Express server and `/api/health` ([notes](docs/week-2.md))
 - [x] **Week 3** — Property search: filters, pagination, validation, indexes ([notes](docs/week-3.md))
 - [x] **Week 4** — Property detail and open house endpoints, request logging, error handling ([notes](docs/week-4.md))
-- [ ] **Week 5** — React frontend: property grid *(in progress)* ([notes](docs/week-5.md))
+- [x] **Week 5** — React frontend: property grid, API client, loading/error states, safe photo parsing ([notes](docs/week-5.md))
 - [ ] **Week 6**
 - [ ] **Week 7**
 - [ ] **Week 8**
@@ -283,9 +308,12 @@ The detailed command log from Weeks 1–3 is in [docs/milestone-log.md](docs/mil
 ## ⚠️ Known Issues and Future Improvements
 
 **Known issues**
-- **Frontend not yet connected:** the React app (not in this repo yet) expects an older response
-  format (`{ success, data }`), sends `page`/`bedrooms` instead of `offset`/`beds`, and opens
-  properties by the internal `id` instead of `L_ListingID`.
+- **Photos:** 211 properties have no photos (`L_Photos` is an empty string), and in a sample about
+  4–6% of photo URLs lead to a 404 or a PDF. The cards show "No photo available" in both cases.
+- **Square meters:** 7 listings store living area in square meters; the cards show the number as sqft.
+- **Grammar:** a property with 1 bathroom shows "1 baths".
+- **No automated tests yet:** testing was done by hand with curl and a browser (Jest, React Testing
+  Library and Supertest are planned).
 - **`backend/sql/indexes.sql` doesn't run as-is on MySQL 8:** it uses `CREATE INDEX IF NOT EXISTS` and doesn't
   turn off strict mode first (see setup step 5 for the workaround).
 - **Dates** come back as UTC timestamps (e.g. `2026-09-20T07:00:00.000Z`) instead of plain dates.
@@ -300,4 +328,6 @@ The detailed command log from Weeks 1–3 is in [docs/milestone-log.md](docs/mil
 - Return plain dates (`dateStrings` option in `db.js`).
 - Clean up orphan open houses and duplicates, convert `rets_openhouse` to InnoDB, add a foreign key.
 - Use one consistent error format and hide internal error details in `/api/health`.
-- Connect the React frontend to the current API and add it to the repository.
+- Add pagination, search filters and a property detail page to the frontend.
+- Add automated tests (Jest, React Testing Library, Supertest).
+- Remove unused template files (`lucide-react`, `hero.png`, logo `.svg`s).
