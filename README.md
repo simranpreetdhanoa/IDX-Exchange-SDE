@@ -267,7 +267,7 @@ values; there is **no foreign key** enforcing it (see Known issues).
 - [x] **Week 2** — Express server and `/api/health` ([notes](docs/week-2.md))
 - [x] **Week 3** — Property search: filters, pagination, validation, indexes ([notes](docs/week-3.md))
 - [x] **Week 4** — Property detail and open house endpoints, request logging, error handling ([notes](docs/week-4.md))
-- [ ] **Week 5**
+- [ ] **Week 5** — React frontend: property grid *(in progress)* ([notes](docs/week-5.md))
 - [ ] **Week 6**
 - [ ] **Week 7**
 - [ ] **Week 8**
