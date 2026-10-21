@@ -1138,5 +1138,4 @@ Evidence: `"react": "^19.2.8"` in `package.json`, `useState`/`useEffect` importe
 - Optional clean-up: unused `lucide-react` package and template images (`hero.png`, logo `.svg`s).
 - 7 listings store living area in square meters (`LivingAreaUnits`) — shown as sqft for now.
 - Data issue to report: ~4–6% of tested photo URLs are 404s or PDFs (from the MLS feed).
-- Update `CLAUDE.md` paths: notes are now in `docs/week-N.md`, README is `README.md`
   (no longer `backend/...`).
