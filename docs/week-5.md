@@ -1,6 +1,6 @@
 # Week 5 — React Frontend: Property Grid
 
-> 🚧 In progress — Steps 0–5 done (debug challenge solved). See "Where we are" below.
+> 🚧 In progress — Steps 0–6 done (debug challenge solved). See "Where we are" below.
 
 ## Goal
 A React frontend that fetches properties from my Express API and shows them as a
@@ -36,9 +36,9 @@ never crashes. *(Solved in Step 3 — see below.)*
 | 2 | API client `src/api/client.js` | ✅ Done — commit `790e5ac`, 9/9 tests pass |
 | 3 | Debug challenge: investigate `L_Photos` | ✅ Solved — commit `4a32c89`; 211 `""` → crash; 404/PDF photos → broken image |
 | 4 | Helper functions `src/utils/property.js` | ✅ Done — commit `35e144a`; 39/39 edge cases, 0 crashes on 55,212 rows |
-| 5 | `PropertyCard` component | ✅ Done — 3/3 render tests (hover + `onError` checked in Step 8) |
-| 6 | `ListingsPage` component | ⏳ Next |
-| 7 | Hook it up in `App.jsx` | ⏳ |
+| 5 | `PropertyCard` component | ✅ Done — commit `85a16e8`; 3/3 render tests (hover + `onError` checked in Step 8) |
+| 6 | `ListingsPage` component | ✅ Done — starts in "Loading…", lint clean (real data checked in Step 7) |
+| 7 | Hook it up in `App.jsx` | ⏳ Next |
 | 8 | Full acceptance check | ⏳ |
 | 9 | Notes + PR | ⏳ |
 
@@ -764,6 +764,130 @@ the screen would never change.
 
 ---
 
+## Step 6 — `ListingsPage` ✅ (`frontend/src/pages/ListingsPage.jsx` + `.css`)
+
+### What & why
+The **manager** of the page: asks `client.js` for properties, shows the right message
+while waiting or when something goes wrong, then shows the **count** and hands each
+house to a `PropertyCard`. Covers requirements 24 and 26.
+```
+ListingsPage
+ ├─ loading?  → "Loading properties…"
+ ├─ error?    → "Couldn't load properties. <clear message from client.js>"
+ └─ data      → "Showing 20 of 55,212 properties"
+                 grid → PropertyCard × 20
+```
+
+### The code
+```jsx
+const PAGE_SIZE = 20;
+
+export default function ListingsPage() {
+  const [properties, setProperties] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Runs once, when the page first appears
+  useEffect(() => {
+    async function load() {
+      try {
+        const data = await fetchProperties({ limit: PAGE_SIZE });
+        setProperties(data.results);
+        setTotal(data.total);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  if (loading) {
+    return <p className="listings-status">Loading properties…</p>;
+  }
+
+  if (error) {
+    return (
+      <div className="listings-status listings-error" role="alert">
+        <strong>Couldn't load properties.</strong> {error}
+      </div>
+    );
+  }
+
+  return (
+    <section className="listings-page">
+      <h1 className="listings-title">Properties for sale</h1>
+      <p className="listings-count">
+        Showing {properties.length.toLocaleString('en-US')} of {total.toLocaleString('en-US')} properties
+      </p>
+      {properties.length === 0 ? (
+        <p className="listings-status">No properties found.</p>
+      ) : (
+        <div className="listings-grid">
+          {properties.map((property) => (
+            // id (row number) is unique; L_ListingID isn't — 3 listings appear twice (Week 4)
+            <PropertyCard key={property.id} property={property} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+```
+
+| Code | Plain English |
+|---|---|
+| 4 × `useState` | The page's memory: houses, total, "still loading?", "what went wrong?" |
+| `useState(true)` for `loading` | Start in loading mode — no data yet |
+| **`useEffect(() => {…}, [])`** | "Run this **after** the page appears." `[]` = **only once**. Comparison: a restaurant fetches the day's menu once when it opens, not every time a customer sits down. |
+| `async function load()` inside | `useEffect` itself can't be `async`, so we make a small `async` function and call it |
+| `data.results`, `data.total` | The backend's **real** field names — fixes the old `data.success` / `data.data` bug |
+| `catch` → `setError(err.message)` | Store `client.js`'s clear sentence to show on screen (the old code only did `console.error`) |
+| `finally` → `setLoading(false)` | Stop showing "Loading" whether it worked or failed |
+| `if (loading) return …` | An **early return** — show a message and stop, like Week 4's `validateListingId` |
+| `role="alert"` | Tells screen readers "important — read this out now" |
+| `properties.length === 0 ?` | No matches → "No properties found" instead of an empty grid |
+| **`properties.map(…)`** | Turns a list of 20 houses into 20 `<PropertyCard>`s — one brick per house |
+| **`key={property.id}`** | React needs a **unique** label on each list item to track which card is which. Comparison: name tags at a party. `L_ListingID` isn't unique (Week 4's 3 duplicates), so we use the row number `id`. |
+
+```css
+.listings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
+}
+```
+"Fit as many columns as possible, each at least 260 px wide, sharing the leftover
+space" — 4 columns on a wide screen, 1 on a phone, no extra code.
+
+### Test
+| Check | Result |
+|---|---|
+| Rendered to HTML (starting state) | ✅ `<p class="listings-status">Loading properties…</p>` |
+| Lint with React rules (`npx oxlint --react-plugin`) | ✅ no problems |
+
+Server-side rendering draws the page **once**, at the start — `useEffect` only runs in a
+real browser, so the fetch never happens here. Real cards and the count → Step 7;
+error when the backend is down → Step 8.
+
+### What I learned: why `[]` matters
+Without `[]`, the effect runs after **every** redraw:
+```
+page appears → useEffect → fetch → setProperties(…) → state changed → React redraws
+     ↑                                                                    │
+     └──────── no [] = "run after EVERY redraw", so it runs again ────────┘
+```
+An **endless loop** — hundreds of requests per second to my backend. `[]` breaks it.
+Comparison: a waiter who, every time food arrives, goes back to order the same food again.
+
+### Check question
+**Q:** What goes wrong if we remove the `[]`?
+**A:** It fetches again after every redraw — an endless loop.
+
+---
+
 ## Problems we hit
 | Problem | Cause | Fix / lesson |
 |---|---|---|
@@ -824,6 +948,12 @@ the screen would never change.
   as soon as the image fails.
 - **How does the hover effect work?** CSS `:hover` lifts the card (`translateY(-4px)`)
   and adds a shadow; `transition` animates it over 0.2 s.
+- **Why `useEffect` instead of fetching directly in the component?** The component
+  function runs on every redraw; fetching there would loop forever. `useEffect` with
+  `[]` fetches once, after the page appears.
+- **Why does each card need a `key`, and why `id` and not `L_ListingID`?** React uses
+  keys to track list items between redraws; they must be unique, and 3 listing IDs
+  appear twice in the data.
 
 ---
 
