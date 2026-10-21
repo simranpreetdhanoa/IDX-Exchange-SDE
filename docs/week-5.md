@@ -1,6 +1,6 @@
 # Week 5 — React Frontend: Property Grid
 
-> 🚧 In progress — Steps 0–4 done (debug challenge solved). See "Where we are" below.
+> 🚧 In progress — Steps 0–5 done (debug challenge solved). See "Where we are" below.
 
 ## Goal
 A React frontend that fetches properties from my Express API and shows them as a
@@ -35,9 +35,9 @@ never crashes. *(Solved in Step 3 — see below.)*
 | 1 | Port 3000 + proxy | ✅ Done — commit `626d698` |
 | 2 | API client `src/api/client.js` | ✅ Done — commit `790e5ac`, 9/9 tests pass |
 | 3 | Debug challenge: investigate `L_Photos` | ✅ Solved — commit `4a32c89`; 211 `""` → crash; 404/PDF photos → broken image |
-| 4 | Helper functions `src/utils/property.js` | ✅ Done — 39/39 edge cases, 0 crashes on 55,212 rows |
-| 5 | `PropertyCard` component | ⏳ Next |
-| 6 | `ListingsPage` component | ⏳ |
+| 4 | Helper functions `src/utils/property.js` | ✅ Done — commit `35e144a`; 39/39 edge cases, 0 crashes on 55,212 rows |
+| 5 | `PropertyCard` component | ✅ Done — 3/3 render tests (hover + `onError` checked in Step 8) |
+| 6 | `ListingsPage` component | ⏳ Next |
 | 7 | Hook it up in `App.jsx` | ⏳ |
 | 8 | Full acceptance check | ⏳ |
 | 9 | Notes + PR | ⏳ |
@@ -647,6 +647,123 @@ without crashing, the seatbelt doesn't help. You have to check it's the right ca
 
 ---
 
+## Step 5 — `PropertyCard` ✅ (`frontend/src/components/PropertyCard.jsx` + `.css`)
+
+### What & why
+My first real React **component** — one LEGO brick that shows **one house**. It
+receives a property, uses the Step 4 helpers for all the text, adds **protection B**
+(placeholder when the photo fails), and has the **hover effect** in its CSS.
+
+### The code
+```jsx
+import { useState } from 'react';
+import { getFirstPhoto, formatPrice, formatSqft, formatCount, formatAddress, formatCityState } from '../utils/property';
+import './PropertyCard.css';
+
+export default function PropertyCard({ property }) {
+  const photoUrl = getFirstPhoto(property.L_Photos);
+  // Debug challenge, protection B: some photo URLs lead to a 404 or a PDF
+  const [photoFailed, setPhotoFailed] = useState(false);
+  const address = formatAddress(property.L_Address);
+
+  return (
+    <article className="property-card">
+      {photoUrl && !photoFailed ? (
+        <img
+          className="property-card-photo"
+          src={photoUrl}
+          alt={`Photo of ${address}`}
+          loading="lazy"
+          onError={() => setPhotoFailed(true)}
+        />
+      ) : (
+        <div className="property-card-photo property-card-placeholder">No photo available</div>
+      )}
+
+      <div className="property-card-body">
+        <p className="property-card-price">{formatPrice(property.L_SystemPrice)}</p>
+        <p className="property-card-address">{address}</p>
+        <p className="property-card-location">{formatCityState(property.L_City, property.L_State)}</p>
+        <p className="property-card-specs">
+          {formatCount(property.L_Keyword2)} beds · {formatCount(property.LM_Dec_3)} baths ·{' '}
+          {formatSqft(property.LM_Int2_3)}
+        </p>
+      </div>
+    </article>
+  );
+}
+```
+
+| Code | Plain English |
+|---|---|
+| `export default function PropertyCard(...)` | A **component** is just a function. `default` = the main thing this file offers (`import PropertyCard from ...`). |
+| `({ property })` | The **props** — input from the parent. `ListingsPage` hands over one house. (The order a manager hands to a waiter.) |
+| `return ( <article> … )` | The **JSX** — what this component shows. `<article>` = an HTML box for one self-contained item. |
+| `className="…"` | JSX's word for HTML's `class` (`class` is reserved in JavaScript). React turns it into `class` in the real HTML. |
+| `{formatPrice(…)}` | Curly braces = "run this JavaScript and put the result here". |
+| `useState(false)` | **State** — a value the card remembers. `setPhotoFailed(true)` changes it and React **redraws** the card. |
+| `photoUrl && !photoFailed ? <img/> : <div/>` | `? :` = "if … then … otherwise …". URL exists **and** hasn't failed → photo; otherwise → placeholder. |
+| `onError={() => setPhotoFailed(true)}` | **Protection B** — the image fails (404, PDF) → remember it → placeholder. |
+| `alt={…}` | Describes the picture for screen readers (used by blind users); shown if it can't load. |
+| `loading="lazy"` | Only download the photo when it's about to scroll into view — faster page with many cards. |
+| `{' '}` | Keeps the space before the sqft when the line wraps (a JSX quirk). |
+
+### The CSS (hover effect)
+```css
+.property-card {
+  /* … white box, border, rounded corners … */
+  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.property-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.12);
+}
+.property-card-photo { display: block; width: 100%; height: 200px; object-fit: cover; }
+```
+| Code | Plain English |
+|---|---|
+| `transition: … 0.2s` | Animate changes over 0.2 seconds instead of jumping |
+| `:hover { translateY(-4px); box-shadow … }` | **The hover effect** — mouse over the card → lift 4 px + shadow |
+| `object-fit: cover` | Fill the photo area without stretching; crop the edges instead |
+| `overflow: hidden` | Keep the photo inside the rounded corners |
+| `property-card-…` names | Can't clash with the old `App.css`, which also has `.card` |
+
+### Test
+Rendered the component to HTML **without a browser** (server-side rendering: drawing a
+component as text) using a throwaway script — no project file changed.
+
+| Test house | Result |
+|---|---|
+| Real data `1118381441` | ✅ `<img src="https://api.cotality.com/…" alt="Photo of 349 E Gobind Blvd" loading="lazy">` · `$1,122,426` · `349 E Gobind Blvd` · `Mountain House, CA` · `5 beds · 4 baths · 2,992 sqft` |
+| `L_Photos: ""` (one of the 211) | ✅ no `<img>`; `No photo available`; rest of the card intact; no crash |
+| Everything missing `{}` | ✅ `Price not listed` · `Address not listed` · `Location not listed` · `— beds · — baths · — sqft` · placeholder; no crash |
+| Lint | ✅ no problems |
+
+All 7 card items appear (requirement 25). `onError` isn't in the HTML — event handlers
+only exist in a live browser — so the photo-fails swap and the hover are checked in Step 8.
+
+**Problem we hit:** the first test run failed with `module is not defined`. That was my
+test script loading React the wrong way through Vite (the error came from inside
+React's own files) — fixed the script; the card code didn't change.
+
+### What I learned: what happens when a photo is a PDF
+```
+1. <img> tries to load the PDF  →  it's not a picture
+2. The browser fires onerror     →  onError={() => setPhotoFailed(true)} runs
+3. photoFailed becomes true      →  state changed, so React REDRAWS the card
+4. The check runs again: photoUrl && !photoFailed  →  false
+5. The "otherwise" part shows    →  "No photo available"
+```
+Step 3 is the key: **changing state is what makes React redraw.** With a normal variable,
+the screen would never change.
+
+### Check question
+**Q:** A card's photo URL leads to a PDF — what happens?
+**A:** `onError` fires → `photoFailed` becomes true → React redraws → placeholder shows.
+
+---
+
 ## Problems we hit
 | Problem | Cause | Fix / lesson |
 |---|---|---|
@@ -702,6 +819,11 @@ without crashing, the seatbelt doesn't help. You have to check it's the right ca
   and the card stays focused on layout.
 - **How do you know `LM_Int2_3` is square feet?** Its average grows with bedrooms
   (1 bed → 768, 6 beds → 5,008).
+- **Why `useState` for `photoFailed` instead of a normal variable?** Changing a normal
+  variable doesn't make React redraw; changing state does, so the placeholder appears
+  as soon as the image fails.
+- **How does the hover effect work?** CSS `:hover` lifts the card (`translateY(-4px)`)
+  and adds a shadow; `transition` animates it over 0.2 s.
 
 ---
 
