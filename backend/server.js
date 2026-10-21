@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const pool = require('./db');
-const propertiesRouter = require('./routes/properties');
+const propertiesRouter = require('./routes/properties'); // Where the route lives week 3
 
 const app = express();
 
@@ -36,7 +36,8 @@ app.get('/api/health', async (req, res) => {
 });
 
 // Properties routes (Week 3)
-app.use('/api/properties', propertiesRouter);
+app.use('/api/properties', propertiesRouter); //Router with all /api/properties endpoints (search, detail, open houses)
+
 
 // Handle 404 Routes
 app.use((req, res) => {
