@@ -1,6 +1,6 @@
 # Week 5 — React Frontend: Property Grid
 
-> 🚧 In progress — Steps 0–3 done (debug challenge solved). See "Where we are" below.
+> 🚧 In progress — Steps 0–4 done (debug challenge solved). See "Where we are" below.
 
 ## Goal
 A React frontend that fetches properties from my Express API and shows them as a
@@ -34,9 +34,9 @@ never crashes. *(Solved in Step 3 — see below.)*
 | 0 | Get `frontend/` into git | ✅ Done — commit `b193b17` |
 | 1 | Port 3000 + proxy | ✅ Done — commit `626d698` |
 | 2 | API client `src/api/client.js` | ✅ Done — commit `790e5ac`, 9/9 tests pass |
-| 3 | Debug challenge: investigate `L_Photos` | ✅ Solved — 211 `""` → crash; 404/PDF photos → broken image |
-| 4 | Helper functions `src/utils/property.js` | ⏳ Next |
-| 5 | `PropertyCard` component | ⏳ |
+| 3 | Debug challenge: investigate `L_Photos` | ✅ Solved — commit `4a32c89`; 211 `""` → crash; 404/PDF photos → broken image |
+| 4 | Helper functions `src/utils/property.js` | ✅ Done — 39/39 edge cases, 0 crashes on 55,212 rows |
+| 5 | `PropertyCard` component | ⏳ Next |
 | 6 | `ListingsPage` component | ⏳ |
 | 7 | Hook it up in `App.jsx` | ⏳ |
 | 8 | Full acceptance check | ⏳ |
@@ -502,6 +502,151 @@ string `""`** (211 properties). There are two different problems:
 
 ---
 
+## Step 4 — Helper functions ✅ (`frontend/src/utils/property.js`)
+
+### First: check the facts
+The README said `LM_Int2_3` "appears to be" living area — not good enough for code.
+Average `LM_Int2_3` by bedrooms grows the way house size does, so it **is** living area:
+
+| Beds | 1 | 2 | 3 | 4 | 5 | 6 |
+|---|---|---|---|---|---|---|
+| Avg `LM_Int2_3` | 768 | 1,215 | 1,731 | 2,488 | 3,604 | 5,008 |
+
+(7 listings say their area is in square **meters** — a tiny edge case, not handled.)
+
+**`L_Photos` isn't the only field with holes:**
+
+| Field | Column | Missing / empty |
+|---|---|---|
+| Price | `L_SystemPrice` | 0 |
+| Sqft | `LM_Int2_3` | 92 missing + 112 zero |
+| Beds | `L_Keyword2` | 104 |
+| Baths | `LM_Dec_3` (comes as text, e.g. `"4.0"`) | 14 |
+| Address | `L_Address` | 135 |
+| City / State | `L_City` / `L_State` | 89 / 67 |
+
+Without care, a card could show `null beds` or `$NaN`.
+
+### What & why
+Small functions that turn raw database values into **safe, readable text**. Each one
+accepts *anything* and **never throws**.
+Comparison: a kitchen prep station — raw ingredients come in (some bruised or
+missing), only clean, ready-to-serve food goes out to the card.
+
+### The code
+```js
+export function getFirstPhoto(rawPhotos) {
+  if (typeof rawPhotos !== 'string' || rawPhotos.trim() === '') return null;
+  try {
+    const photos = JSON.parse(rawPhotos);
+    if (!Array.isArray(photos)) return null;
+    const first = photos[0];
+    return typeof first === 'string' && first.trim() !== '' ? first : null;
+  } catch {
+    return null; // broken JSON
+  }
+}
+
+function toNumber(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+export function formatPrice(value) {          // 1122426 → "$1,122,426"
+  const price = toNumber(value);
+  if (price === null || price <= 0) return 'Price not listed';
+  return '$' + price.toLocaleString('en-US');
+}
+
+export function formatSqft(value) {           // 2992 → "2,992 sqft"
+  const sqft = toNumber(value);
+  if (sqft === null || sqft <= 0) return '— sqft';
+  return `${sqft.toLocaleString('en-US')} sqft`;
+}
+
+export function formatCount(value) {          // "4.0" → "4", "2.5" → "2.5", missing → "—"
+  const count = toNumber(value);
+  return count === null ? '—' : String(count);
+}
+
+export function formatAddress(address) {
+  return typeof address === 'string' && address.trim() !== '' ? address.trim() : 'Address not listed';
+}
+
+export function formatCityState(city, state) { // ("Mountain House", "CA") → "Mountain House, CA"
+  const parts = [city, state]
+    .map((part) => (typeof part === 'string' ? part.trim() : ''))
+    .filter((part) => part !== '');
+  return parts.length > 0 ? parts.join(', ') : 'Location not listed';
+}
+```
+
+**`getFirstPhoto` — the debug challenge fix (protection A)**
+| Code | Plain English |
+|---|---|
+| `typeof rawPhotos !== 'string'` | Not text at all (e.g. `null`) → no photo. `typeof` tells you what kind of value something is. |
+| `.trim() === ''` | Empty or only spaces → no photo. **Catches the 211.** `trim()` removes spaces at both ends. |
+| `try { JSON.parse } catch { return null }` | Seatbelt: broken JSON → "no photo", not a crash |
+| `Array.isArray(photos)` | `JSON.parse("null")` / `("{}")` don't throw but aren't lists |
+| `typeof first === 'string'` | First item must be text — `[1]`, `[null]` → no photo |
+| returns `null` | "No usable photo" → the card shows the placeholder (Step 5) |
+
+**The other helpers**
+| Code | Plain English |
+|---|---|
+| `toNumber` | Private helper. `Number("4.0")` → 4; missing or rubbish → `null`. `Number("abc")` gives **`NaN`** ("Not a Number"); **`Number.isFinite`** = "is it a real number?" |
+| `toLocaleString('en-US')` | Adds commas: `1122426` → `1,122,426` |
+| `price <= 0` | A price of 0 isn't real → "Price not listed" |
+| `formatCityState` | `.map` tidies each part, `.filter` drops empty ones, `.join(', ')` glues them — no `"Fresno, "` |
+
+**Protection B** (404/PDF photos) needs `onError` on the `<img>`, so it lives in the card (Step 5).
+
+### Test
+**1. Edge cases — 39 of 39 ✅** (throwaway script)
+
+| Function | Tricky inputs → result |
+|---|---|
+| `getFirstPhoto` | `""`, `"   "`, `null`, `undefined`, `"broken["`, `"null"`, `"{}"`, `"[]"`, `"[1]"`, `"[\"\"]"`, `"\"just text\""`, `42` → all `null`; a real list → first URL |
+| `formatPrice` | `1122426` → `$1,122,426`; `"950000"` → `$950,000`; `0`, `null`, `"abc"`, `-5` → `Price not listed` |
+| `formatSqft` | `2992` → `2,992 sqft`; `0`, `null`, `""` → `— sqft` |
+| `formatCount` | `"4.0"` → `4`; `"2.5"` → `2.5`; `0` → `0`; `null`, `""`, `"x"` → `—` |
+| `formatAddress` | spaces trimmed; `""`, `null` → `Address not listed` |
+| `formatCityState` | `("Fresno", "")` → `Fresno`; nothing → `Location not listed` |
+
+**2. Every real row (55,212) — 0 crashes ✅**
+
+| What | Count |
+|---|---|
+| No photo | **211** (exactly the empty strings) |
+| No sqft | 204 (92 + 112) |
+| No beds / baths | 104 / 14 |
+| No address | 135 |
+| No city and no state | 65 |
+| Price not listed | 0 |
+
+Example card text for `1118381441`:
+```
+$1,122,426 | 349 E Gobind Blvd | Mountain House, CA | 5 beds | 4 baths | 2,992 sqft
+```
+All 7 card items — including state and sqft, which the old code was missing.
+
+**3. Lint** (`npx oxlint`) ✅ no problems.
+
+### What I learned: `try/catch` vs `Array.isArray`
+`JSON.parse("null")` **succeeds** and returns `null` — nothing is thrown, so `try/catch`
+never runs. `Array.isArray` is what catches it.
+**`try/catch` only protects against errors that are *thrown*.** A value that parses fine
+but is the wrong *kind* needs its own check.
+Comparison: the seatbelt protects you in a crash — but if you got into the **wrong car**
+without crashing, the seatbelt doesn't help. You have to check it's the right car.
+
+### Check question
+**Q:** `getFirstPhoto("null")` returns `null`. Which line catches it — `try/catch` or another check?
+**A:** `Array.isArray` — `JSON.parse("null")` doesn't throw.
+
+---
+
 ## Problems we hit
 | Problem | Cause | Fix / lesson |
 |---|---|---|
@@ -552,12 +697,17 @@ string `""`** (211 properties). There are two different problems:
   hammer someone else's server; a random sample still shows the pattern.
 - **Why does a JPEG labelled `text/plain` still show?** Browsers check the file
   itself for images, not the label.
+- **Why put the helpers in a separate file instead of inside the card?** They're plain
+  functions with no React, so I can test them on all 55,212 rows without a browser,
+  and the card stays focused on layout.
+- **How do you know `LM_Int2_3` is square feet?** Its average grows with bedrooms
+  (1 bed → 768, 6 beds → 5,008).
 
 ---
 
 ## Still to do / ask
 - Step 8: test "Cannot reach the backend" (stop the backend — ask first).
-- Confirm which column holds square feet (`LM_Int2_3` looks likely, e.g. 3,677).
+- 7 listings store living area in square meters (`LivingAreaUnits`) — shown as sqft for now.
 - Data issue to report: ~4–6% of tested photo URLs are 404s or PDFs (from the MLS feed).
 - Update `CLAUDE.md` paths: notes are now in `docs/week-N.md`, README is `README.md`
   (no longer `backend/...`).
