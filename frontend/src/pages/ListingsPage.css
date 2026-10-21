@@ -1,0 +1,20 @@
+/* Listings page (Week 5) */
+.listings-page { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
+.listings-title { margin: 0 0 4px; font-size: 1.8rem; color: #0f172a; }
+.listings-count { margin: 0 0 20px; color: #64748b; }
+
+/* The grid: as many 260px+ columns as fit, each sharing the leftover space */
+.listings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.listings-status { max-width: 1200px; margin: 40px auto; padding: 0 16px; text-align: center; color: #475569; }
+.listings-error {
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 16px;
+}
