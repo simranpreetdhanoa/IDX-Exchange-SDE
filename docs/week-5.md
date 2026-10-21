@@ -1,6 +1,6 @@
 # Week 5 — React Frontend: Property Grid
 
-> 🚧 In progress — Steps 0–7 done: the property grid works in the browser. See "Where we are" below.
+> ✅ All requirements and acceptance criteria pass (Step 8: 8/8). Remaining: README + PR (Step 9).
 
 ## Goal
 A React frontend that fetches properties from my Express API and shows them as a
@@ -38,9 +38,9 @@ never crashes. *(Solved in Step 3 — see below.)*
 | 4 | Helper functions `src/utils/property.js` | ✅ Done — commit `35e144a`; 39/39 edge cases, 0 crashes on 55,212 rows |
 | 5 | `PropertyCard` component | ✅ Done — commit `85a16e8`; 3/3 render tests (hover + `onError` checked in Step 8) |
 | 6 | `ListingsPage` component | ✅ Done — commit `4080e24`; starts in "Loading…", lint clean |
-| 7 | Hook it up in `App.jsx` | ✅ Done — 20 real cards, "Showing 20 of 55,212", 0 console errors |
-| 8 | Full acceptance check | ⏳ Next |
-| 9 | Notes + PR | ⏳ |
+| 7 | Hook it up in `App.jsx` | ✅ Done — commit `80810ef`; 20 real cards, "Showing 20 of 55,212", 0 console errors |
+| 8 | Full acceptance check | ✅ Done — **8/8 criteria** + `onError` swap, in a real browser |
+| 9 | README + PR | ⏳ Next |
 
 ---
 
@@ -976,6 +976,81 @@ effects twice on purpose to help catch bugs. A deployed site fetches once.
 
 ---
 
+## Step 8 — Full acceptance check ✅ (8/8)
+
+### How I tested
+A throwaway script controlled headless Chrome through the **Chrome DevTools Protocol**
+(Chrome's "remote control" — the same thing Chrome's developer tools use). It could:
+slow the network down, move a virtual mouse, change a photo on purpose, read the
+console and take screenshots. No project file changed.
+
+### Results
+| # | Criterion | Result | Evidence |
+|---|---|---|---|
+| 1 | Runs on port 3000 without errors | ✅ | `http://localhost:3000/`, **0** console errors |
+| 2 | Real data from the database | ✅ | 20 cards; **20/20** match the API's address + price, same order |
+| 3 | `L_Photos` parsed, **first** photo shown | ✅ | **19/19** `<img src>` = the first URL in that house's `L_Photos`; all 19 loaded; 1 placeholder (582 Pasture Ave) |
+| 4 | Loading state | ✅ | Network slowed to a 3 s delay → "Loading properties…" with 0 cards |
+| 5 | Error if backend unreachable | ✅ | See below |
+| 6 | Property count | ✅ | "Showing 20 of 55,212 properties" |
+| 7 | Hover effect | ✅ | `transform: none` → **`matrix(1, 0, 0, 1, 0, -4)`** while hovering (the last number, −4, = 4 px up) + shadow |
+| 8 | API client throws meaningful errors | ✅ | 404 / 400 / no server (Step 2) + backend down (#5) |
+| + | Protection B (`onError`) | ✅ | Card 3's photo changed to a **real 404 URL** from Step 3 → placeholder shown, `<img>` removed, rest of card intact |
+
+Screenshot 1: card 1 lifted with a shadow (mouse hovering); card 2 (582 Pasture Ave)
+"No photo available" from **protection A**; card 3 (14947 Dickens Street 3)
+"No photo available" from **protection B** — in Step 7 it showed a red door.
+
+### Test #5 — backend unreachable
+1. Stopped only the backend, by exact process ID (npm, nodemon, server). Vite kept running on 3000.
+2. The proxy now answered **HTTP 502** with an **empty** body (`text/plain`).
+3. The page showed, in a red box:
+   **"Couldn't load properties. Cannot reach the backend. Is the API running on port 5000?"**
+   — 0 cards, no stuck "Loading…", **0 crashes**.
+4. Restarted the backend (`npm run dev` in `backend/`) → health 200, 55,212 properties through the proxy again.
+
+Why this message: the proxy *did* answer (502), so `fetch` didn't throw — `if (!response.ok)`
+caught it, and the empty body (`body === null`) with status ≥ 500 means "the proxy
+couldn't reach Express" rather than an Express error.
+
+### Week 5 checkpoint
+- [x] Property grid renders with real photos, prices, and addresses
+- [x] Photo parsing handles missing, null, and malformed `L_Photos` values gracefully
+- [x] API errors are caught and displayed to the user
+
+---
+
+## Week 5 vs the guide
+
+### Done differently (same result)
+| Guide says | What I did | Why |
+|---|---|---|
+| `"proxy": "http://localhost:5000"` in `package.json` | `server.proxy` in `vite.config.js` | My app uses **Vite**, which ignores the `package.json` line; the guide assumes Create React App |
+| Port 3000 (automatic in Create React App) | `port: 3000` + `strictPort` in `vite.config.js` | Vite's default is 5173 |
+| "Wrap `JSON.parse` in try/catch" | `try/catch` **plus** `Array.isArray`, a text check, and `onError` on the image | `try/catch` misses values that parse without throwing (`"null"`) and photos that are 404s/PDFs |
+
+### What the data really showed vs the hints
+| Guide says | Real data |
+|---|---|
+| "not all rows have valid JSON" | 211 rows are `""`; every other row is valid JSON |
+| "missing, null, and malformed" | 0 `NULL` today — handled anyway (tested) |
+| "images are broken for some properties" | Two causes: `""` **and** valid URLs that lead to a 404 or a PDF |
+| "Showing 20 of 487 properties" | "Showing 20 of 55,212 properties" — same format, my real total |
+
+### Extras (not asked for)
+- `src/utils/property.js` — safe text for missing price, beds, sqft…
+- "No properties found" message for empty results
+- Repo restructure so `frontend/` and `backend/` live side by side
+
+### React vs Vite
+**I am using React.** Vite is the tool that *runs* the React app (dev server, proxy,
+reload on save). Comparison: React is the **recipe**, Vite is the **oven**. Create React
+App is an older oven for the same recipe — retired by the React team in 2025.
+Evidence: `"react": "^19.2.8"` in `package.json`, `useState`/`useEffect` imported from
+`'react'`, components written in `.jsx`.
+
+---
+
 ## Problems we hit
 | Problem | Cause | Fix / lesson |
 |---|---|---|
@@ -1046,11 +1121,19 @@ effects twice on purpose to help catch bugs. A deployed site fetches once.
   effects twice in development to help find bugs; production fetches once.
 - **Why did you replace `index.css`?** It was Vite's template: it centred all text and
   made the title unreadable in dark mode.
+- **How did you test the hover effect and the error message?** Controlled headless
+  Chrome remotely: moved a virtual mouse (card moved up 4 px), and stopped the backend
+  (red error message, no crash).
+- **The guide says Create React App — are you using React?** Yes. Vite only runs the
+  React app; it's the modern replacement for Create React App, which is retired.
+- **Why is the proxy not in `package.json` like the hint says?** That line only works
+  in Create React App; Vite reads the proxy from `vite.config.js`.
 
 ---
 
 ## Still to do / ask
-- Step 8: test "Cannot reach the backend" (stop the backend — ask first), hover, and the `onError` swap.
+- Step 9: README update for Week 5, push, PR.
+- Next branch `fix/guide-tooling`: add Jest, React Testing Library and Supertest (the guide's testing stack).
 - Optional: "1 baths" → "1 bath", "1 beds" → "1 bed".
 - Optional clean-up: unused `lucide-react` package and template images (`hero.png`, logo `.svg`s).
 - 7 listings store living area in square meters (`LivingAreaUnits`) — shown as sqft for now.
