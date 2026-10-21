@@ -27,6 +27,8 @@ This repository contains:
 | Dev auto-restart | nodemon | 1.14.10 |
 | Database | MySQL (Docker image `mysql:8`) | 8.4.11 |
 | Frontend | React (run with Vite) | React 19.3.0, Vite 8.3.3 |
+| Testing (backend) | Jest + Supertest | Jest 30.5.2, Supertest 7.3.1 |
+| Testing (frontend) | Jest + React Testing Library (jsdom) | Jest 30.5.2, React Testing Library 16.3.3 |
 
 ---
 
@@ -54,23 +56,28 @@ only part that knows the database password, checks every request, and decides wh
 ```
 .
 ├── backend/
-│   ├── server.js            # Starts Express: request logger, CORS, routes, 404 and error handlers
+│   ├── app.js               # Builds the Express app: request logger, CORS, routes, 404 and error handlers
+│   ├── server.js            # Starts the app on port 5000
 │   ├── db.js                # MySQL connection pool (reads settings from .env)
 │   ├── routes/
 │   │   └── properties.js    # /api/properties endpoints + listing ID validation
+│   ├── __tests__/
+│   │   └── properties.test.js  # Supertest tests for every endpoint
 │   ├── sql/
 │   │   └── indexes.sql      # Database indexes for fast searching
 │   ├── .env.example         # Template for your .env file (placeholders only)
 │   └── package.json
 ├── frontend/
 │   ├── src/
-│   │   ├── api/client.js                # All calls to the backend; throws clear errors
-│   │   ├── utils/property.js            # Safe formatting + photo parsing (never crashes)
-│   │   ├── components/PropertyCard.jsx  # One property card (+ .css: hover effect)
-│   │   ├── pages/ListingsPage.jsx       # Fetches listings; loading, error, count, grid
+│   │   ├── api/client.js                # All calls to the backend; throws clear errors (+ client.test.js)
+│   │   ├── utils/property.js            # Safe formatting + photo parsing (+ property.test.js)
+│   │   ├── components/PropertyCard.jsx  # One property card; .css: hover effect (+ PropertyCard.test.jsx)
+│   │   ├── pages/ListingsPage.jsx       # Loading, error, count, grid (+ ListingsPage.test.jsx)
 │   │   ├── App.jsx                      # Shows ListingsPage
 │   │   └── main.jsx                     # Starts React
 │   ├── vite.config.js                   # Port 3000 + /api proxy
+│   ├── jest.config.js, jest.setup.js    # Jest settings (pretend browser page, extra checks)
+│   ├── babel.config.cjs                 # Lets Jest read JSX (Vite doesn't use it)
 │   └── package.json
 ├── docs/                    # Weekly notes (week-1.md … week-5.md), milestone-log.md, images/
 ├── README.md
@@ -160,6 +167,31 @@ npm run dev
 ```
 Open **http://localhost:3000**. You should see "Showing 20 of 55,212 properties" and a grid of cards.
 If the API isn't running, the page shows: *"Couldn't load properties. Cannot reach the backend…"*
+
+---
+
+## 🧪 Testing
+
+Both parts have automatic tests that run with `npm test` (the tools from the internship guide).
+
+| Part | Tools | Tests | What they check |
+|---|---|---|---|
+| Backend | Jest + Supertest | 14 | Every endpoint: health, property (200/404/400), open houses, search filters and validation, unknown routes |
+| Frontend | Jest + React Testing Library | 57 | Photo parsing and formatting, the API client's error messages, the property card, and the listings page (loading, error, count) |
+
+```bash
+# backend — MySQL (Docker) must be running; the tests use the real database
+cd backend
+npm test
+
+# frontend — no backend needed (the API calls are replaced by mocks)
+cd frontend
+npm test
+```
+Expected: `Tests: 14 passed, 14 total` and `Tests: 57 passed, 57 total`.
+
+> The backend test output starts with a harmless `console.error` box: it's dotenv's
+> "injected env from .env" message, not a failing test.
 
 ---
 
@@ -312,8 +344,11 @@ The detailed command log from Weeks 1–3 is in [docs/milestone-log.md](docs/mil
   4–6% of photo URLs lead to a 404 or a PDF. The cards show "No photo available" in both cases.
 - **Square meters:** 7 listings store living area in square meters; the cards show the number as sqft.
 - **Grammar:** a property with 1 bathroom shows "1 baths".
-- **No automated tests yet:** testing was done by hand with curl and a browser (Jest, React Testing
-  Library and Supertest are planned).
+- **Backend tests use the real database:** MySQL must be running, and they rely on a few known
+  listings (e.g. `1118381441`). A separate test database would make them independent.
+- **`npm audit` warnings:** mostly from the old **nodemon 1.14.10** in the backend; a few from the
+  frontend's test packages (development-only).
+- **Not covered by automatic tests:** the hover effect and running on port 3000 (checked by hand in a browser).
 - **`backend/sql/indexes.sql` doesn't run as-is on MySQL 8:** it uses `CREATE INDEX IF NOT EXISTS` and doesn't
   turn off strict mode first (see setup step 5 for the workaround).
 - **Dates** come back as UTC timestamps (e.g. `2026-09-20T07:00:00.000Z`) instead of plain dates.
@@ -329,5 +364,6 @@ The detailed command log from Weeks 1–3 is in [docs/milestone-log.md](docs/mil
 - Clean up orphan open houses and duplicates, convert `rets_openhouse` to InnoDB, add a foreign key.
 - Use one consistent error format and hide internal error details in `/api/health`.
 - Add pagination, search filters and a property detail page to the frontend.
-- Add automated tests (Jest, React Testing Library, Supertest).
+- Upgrade nodemon to clear the `npm audit` warnings.
+- Use a separate test database for the backend tests.
 - Remove unused template files (`lucide-react`, `hero.png`, logo `.svg`s).

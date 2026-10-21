@@ -1,6 +1,7 @@
 # Week 5 — React Frontend: Property Grid
 
-> ✅ All requirements and acceptance criteria pass (Step 8: 8/8). Remaining: README + PR (Step 9).
+> ✅ All requirements and acceptance criteria pass (Step 8: 8/8) — merged in PR #5.
+> ✅ Testing tools from the guide added (Jest, Supertest, React Testing Library): **71 automatic tests** — see "Part C".
 
 ## Goal
 A React frontend that fetches properties from my Express API and shows them as a
@@ -1051,6 +1052,163 @@ Evidence: `"react": "^19.2.8"` in `package.json`, `useState`/`useEffect` importe
 
 ---
 
+## Part C — Testing tools from the guide (branch `fix/guide-tooling`)
+
+### Why
+The guide's tech stack is React · Node.js + Express · MySQL 8 in Docker ·
+**Jest + React Testing Library + Supertest**. Everything was in place except the
+**testing tools** — all my tests so far were one-off checks (curl, throwaway scripts).
+Now they're saved test files that run with one command: `npm test`.
+
+| Tool | What it does | Comparison |
+|---|---|---|
+| **Jest** | Runs test files and reports ✅/❌ (the "test runner") | The exam hall and the marker |
+| **Supertest** | Sends pretend requests to the Express app — like `curl`, but inside a test, no port needed | A mystery shopper checking the kitchen |
+| **React Testing Library** | Draws a component on a pretend page and finds things the way a user would (text, "the image", "the alert") | A mystery shopper checking the dining room |
+
+### The steps
+| Step | What | Commit |
+|---|---|---|
+| T1 | Split `backend/server.js` into `app.js` (builds the app) + `server.js` (starts it) | `99300f5` |
+| T2 | Install Jest + Supertest in `backend/`, add `"test": "jest"` | `6e8a730` |
+| T3 | `backend/__tests__/properties.test.js` — 14 tests | `e69c214` |
+| T4 | Set up Jest + React Testing Library in `frontend/` (Babel, jsdom, CSS stand-in) | `fe9809c` |
+| T5 | `frontend/src/utils/property.test.js` — 39 tests | `0d8b22d` |
+| T6 | `frontend/src/api/client.test.js` — 11 tests | `a8d6275` |
+| T7 | `PropertyCard.test.jsx` + `ListingsPage.test.jsx` — 7 tests | `8f68211` |
+
+### T1 — Why split `app.js` and `server.js`?
+`server.js` did two jobs: **build** the app and **start** it on port 5000. Supertest needs
+the app *without* starting a server (or it would fight the running backend for port 5000).
+Comparison: separating **building the car** (`app.js`) from **driving it** (`server.js`).
+
+```js
+// backend/server.js — starts the API
+const app = require('./app');
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server listening on http://localhost:${PORT}`);
+});
+```
+`app.js` = the old `server.js` minus `app.listen`, ending with `module.exports = app;`.
+Test: same answers from every endpoint; `require('./app')` opens **0** ports.
+`npm run dev` didn't change.
+
+Note: git records this as "`server.js` changed + `app.js` new", not a rename — a rename
+only happens when the old file disappears, and `server.js` still exists. History stays
+on `backend/server.js`.
+
+### T2–T3 — Backend tests (Jest + Supertest)
+```bash
+cd backend
+npm install --save-dev jest supertest   # --save-dev = tools for developing, not for running the app
+npm test
+```
+```js
+const request = require('supertest');
+const app = require('../app');
+const pool = require('../db');
+
+beforeAll(() => jest.spyOn(console, 'log').mockImplementation(() => {})); // mute the request logger
+afterAll(async () => {
+  console.log.mockRestore();
+  await pool.end(); // close MySQL connections, or Jest waits forever
+});
+
+test('returns 404 with a helpful message for an unknown ID', async () => {
+  const res = await request(app).get('/api/properties/999999999');
+  expect(res.status).toBe(404);
+  expect(res.body.error).toMatch(/No property found with listing ID 999999999/);
+});
+```
+| Word | Plain English |
+|---|---|
+| `describe` / `test` | A group of checks / one check, with a sentence saying what should happen |
+| `request(app).get(…)` | Supertest — a pretend request to `app.js` |
+| `expect(x).toBe(y)` | `x` must be exactly `y`, or the test fails |
+| `test.each([...])` | Run the same test once per value (4 bad IDs, 1 test written) |
+| `beforeAll` / `afterAll` | Run once before / after all tests |
+
+**14 tests:** health · full property · 404 unknown · 400 for `abc123`, `-5`, `12.5`, 21 digits ·
+open houses array · `[]` · orphan 404 · search filters · `limit=500` → 400 · min > max → 400 · unknown route 404.
+**Needs MySQL running** (they use the real database).
+
+**Design choice:** the search test checks **rules** ("every result is in LA, ≥ $300k,
+≥ 3 beds"), not a number that can change ("total is 2,468").
+
+Jest looks for tests in `__tests__/` folders or files ending in `.test.js`.
+
+### T4 — Frontend setup (3 problems, 3 fixes)
+| Problem | Fix |
+|---|---|
+| Jest can't read JSX or `import` (Vite translates them, but Jest doesn't use Vite) | **Babel** — `babel.config.cjs` (used only by Jest) |
+| Tests run in Node.js — no web page | **jsdom** — a pretend browser page (`testEnvironment: 'jsdom'`) |
+| Components import `.css` — Jest only reads JavaScript | `moduleNameMapper`: `.css` → `test/styleMock.js` (an empty stand-in) |
+
+Comparison: Babel is the translator, jsdom is a practice stage, the CSS stand-in is a cardboard prop.
+
+New files: `babel.config.cjs`, `jest.config.js`, `jest.setup.js` (loads `@testing-library/jest-dom`
+for checks like `toBeInTheDocument()`), `test/styleMock.js`. `.cjs` = this one file uses the
+older `require` style, because the frontend is `"type": "module"`.
+Proved Vite ignores the Babel file: after a restart the app was identical (20 cards, 0 console errors).
+
+### T5–T7 — Frontend tests
+| File | Tests | What it checks |
+|---|---|---|
+| `src/utils/property.test.js` | 39 | The Week 5 edge cases — 12 bad `L_Photos` values → `null`, never a crash; price, sqft, beds/baths, address, city/state |
+| `src/api/client.test.js` | 11 | URL building; every error message — 400, 404, Express 500, "Cannot reach the **backend**" (502, no JSON), "Cannot reach the **server**" (`fetch` fails) |
+| `src/components/PropertyCard.test.jsx` | 4 | All 7 items + first photo; placeholder for `""` (protection A); `onError` swap (protection B); everything missing |
+| `src/pages/ListingsPage.test.jsx` | 3 | "Loading…" then count + cards; error alert; "No properties found." |
+
+**Mocks** — stand-ins we control (comparison: a flight simulator — practise engine failure
+without a real crash):
+```js
+global.fetch = jest.fn();                          // pretend fetch
+fetch.mockResolvedValue(fakeResponse(502));        // "answer with a 502, no body" = backend down
+jest.mock('../api/client');                        // pretend client.js for the page tests
+fetchProperties.mockRejectedValue(new Error('…')); // "fail with this message"
+```
+So "backend down" is tested **without stopping anything**.
+
+**React Testing Library words:**
+| Code | Plain English |
+|---|---|
+| `render(<PropertyCard … />)` | Draw the component on the pretend page |
+| `screen.getByText('…')` | Find by text — fails if it's not there |
+| `getByRole('img', { name: '…' })` | Find by what it is + its label (the way screen readers see the page) |
+| `queryBy…` | Like `getBy…` but returns `null` — to check something is **not** there |
+| `await findBy…` | **Wait** for something to appear (the cards after the pretend fetch answers) |
+| `fireEvent.error(img)` | Pretend the photo failed to load → triggers `onError` |
+
+### Proof the tests catch bugs
+A test that can never fail is useless. Each time, I broke the code in a **throwaway copy**
+(the real files unchanged) and ran the tests:
+
+| Broke | Test that caught it |
+|---|---|
+| `limit` allowed up to 1000 | `rejects limit=500 with 400` — expected 400, received 200 |
+| Removed `Array.isArray` from `getFirstPhoto` | `returns null for JSON text, not an array` — received `"j"` |
+| Removed `body === null &&` from the backend-down check | `keeps a real Express 500 message` — got "Cannot reach the backend" instead |
+| Removed `onError` from `PropertyCard` | `swaps to the placeholder when the photo fails to load` |
+
+**Surprise:** I predicted removing `Array.isArray` would fail 3 tests — only 1 did. `"null"`
+was still caught by `try/catch` (`null[0]` throws), and `"{}"` by the "is it text?" check.
+But `"just text"` → `"just text"[0]` = **`"j"`** — a card would try to load a photo from `j`.
+Lesson: run the test, don't trust the prediction.
+
+### Results
+| | Tests | Command |
+|---|---|---|
+| Backend | **14** ✅ | `cd backend && npm test` (MySQL must be running) |
+| Frontend | **57** ✅ | `cd frontend && npm test` |
+| **Total** | **71** ✅ | |
+
+Every Week 5 acceptance criterion now has an automatic test, except **port 3000** and the
+**hover effect** — those need a real browser and mouse (checked by hand in Step 8).
+
+---
+
 ## Problems we hit
 | Problem | Cause | Fix / lesson |
 |---|---|---|
@@ -1060,6 +1218,10 @@ Evidence: `"react": "^19.2.8"` in `package.json`, `useState`/`useEffect` importe
 | `cd backend` → "no such file or directory" and `npm run dev` → "Missing script" | After the rename, the backend is at `IDX-Exchange-SDE/backend`. npm reads the `package.json` of the folder you're in. | `cd IDX-Exchange-SDE/backend`. Use `pwd` when unsure. |
 | README diagram looked misaligned in a check | The check counted **bytes**; `│` and `─` are 3 bytes but 1 character | Re-counted characters: all 99. Lesson: check the measuring tool before trusting a ❌ |
 | MySQL "Access denied" with the container's saved password | The `MYSQL_ROOT_PASSWORD` saved in the container only applies on first setup; the real password was probably changed later | Not a problem for the app — the backend connects fine with `.env` |
+| App on port 5173 instead of 3000 after `git pull` | Switching to the old `main` (no frontend yet) briefly removed `vite.config.js`; Vite restarted without it | Restart the dev server after `git checkout`/`git pull` if the app acts strangely |
+| `console.error` boxes at the top of the backend test output | dotenv 18 prints "injected env … from .env" when it loads; Jest shows it as a warning | Harmless. Optional fix: `require('dotenv').config({ quiet: true })` |
+| `npm audit` warnings | Mostly the old **nodemon 1.14.10** (2018); a few from the new test packages (dev-only) | Not fixed yet — upgrade nodemon in a separate step |
+| A check said "photos: 0" while 19 photos were on the page | My search expected `src` right after `class`, but the browser writes `src` last | Counted `<img` tags instead: 19. Check the test before trusting a ❌ |
 
 ---
 
@@ -1128,14 +1290,28 @@ Evidence: `"react": "^19.2.8"` in `package.json`, `useState`/`useEffect` importe
   React app; it's the modern replacement for Create React App, which is retired.
 - **Why is the proxy not in `package.json` like the hint says?** That line only works
   in Create React App; Vite reads the proxy from `vite.config.js`.
+- **Why split `app.js` and `server.js`?** So tests can import the Express app and send it
+  requests with Supertest without starting a real server on a port.
+- **What's the difference between these tests and the curl checks before?** Same checks,
+  but saved in files and run automatically with `npm test` — anyone can rerun them in seconds.
+- **Why does the frontend need Babel for Jest?** Vite translates JSX for the browser, but
+  Jest doesn't use Vite; Babel does the same translation for Jest only.
+- **What is a mock?** A stand-in you control — e.g. a pretend `fetch` that answers 502, so
+  "backend down" can be tested without stopping the backend.
+- **How do you know your tests actually work?** I broke the code on purpose in a copy
+  (4 times) and the right test failed each time.
+- **Why `findBy` in `ListingsPage` but `getBy` in `PropertyCard`?** The page loads data
+  after it appears (`useEffect` + fetch), so the test must wait; the card shows its text immediately.
+- **Why do the backend tests need MySQL running?** They call the real database. A separate
+  test database would be a later improvement.
 
 ---
 
 ## Still to do / ask
-- Step 9: README update for Week 5, push, PR.
-- Next branch `fix/guide-tooling`: add Jest, React Testing Library and Supertest (the guide's testing stack).
+- Upgrade nodemon (old 1.14.10 causes `npm audit` warnings).
+- Optional: quiet dotenv's start-up message in tests (`config({ quiet: true })`).
+- Later: a separate test database so backend tests don't depend on the real data.
 - Optional: "1 baths" → "1 bath", "1 beds" → "1 bed".
 - Optional clean-up: unused `lucide-react` package and template images (`hero.png`, logo `.svg`s).
 - 7 listings store living area in square meters (`LivingAreaUnits`) — shown as sqft for now.
 - Data issue to report: ~4–6% of tested photo URLs are 404s or PDFs (from the MLS feed).
-  (no longer `backend/...`).
