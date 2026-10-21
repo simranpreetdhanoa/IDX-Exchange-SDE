@@ -1,6 +1,6 @@
 # Week 5 — React Frontend: Property Grid
 
-> 🚧 In progress — Steps 0 and 1 done. See "Where we are" below.
+> 🚧 In progress — Steps 0, 1 and 2 done. See "Where we are" below.
 
 ## Goal
 A React frontend that fetches properties from my Express API and shows them as a
@@ -32,9 +32,9 @@ never crashes. *(Not started — hints only.)*
 | — | Checks before starting (Week 5 status, Week 4 re-test) | ✅ Done |
 | — | Restructure the repo (R1–R8) | ✅ Done — PR #4 merged |
 | 0 | Get `frontend/` into git | ✅ Done — commit `b193b17` |
-| 1 | Port 3000 + proxy | ✅ Done (not committed yet) |
-| 2 | API client `src/api/client.js` | ⏳ Next |
-| 3 | Debug challenge: investigate `L_Photos` | ⏳ |
+| 1 | Port 3000 + proxy | ✅ Done — commit `626d698` |
+| 2 | API client `src/api/client.js` | ✅ Done — 9/9 tests pass |
+| 3 | Debug challenge: investigate `L_Photos` | ⏳ Next |
 | 4 | Helper functions `src/utils/property.js` | ⏳ |
 | 5 | `PropertyCard` component | ⏳ |
 | 6 | `ListingsPage` component | ⏳ |
@@ -260,6 +260,139 @@ The page itself still shows "0 Total" — the old `App.jsx` gets fixed in steps 
 
 ---
 
+## Step 2 — API client ✅ (`frontend/src/api/client.js`)
+
+### Why do we need it?
+1. **It's a requirement** (#23) and an acceptance criterion ("throws meaningful error messages").
+2. **One place for all backend talk.** The old `App.jsx` had 3 separate `fetch` calls,
+   each with the same bugs (checked `data.success`, never checked `res.ok`, wrong
+   parameter names). With `client.js` each thing is written once.
+3. **Components stay simple:** `const data = await fetchProperties({ limit: 20 });`
+   — data, or a clear error. Same idea as Week 4's middleware: each piece does one job.
+
+**Comparison:** one trained waiter who carries every order to the kitchen and comes
+back with either the food or a clear message — instead of every customer walking
+into the kitchen. If the kitchen changes, you retrain one waiter.
+
+**Check question:** if the API path changed to `/api/v2/properties`, how many files
+change? **A:** With `client.js`: **one**. Old way: 2 edits in `App.jsx` today — and
+one in *every* component file once the app has several pages.
+
+### The code
+```js
+async function request(path) {
+  let response;
+  try {
+    response = await fetch(path);
+  } catch {
+    throw new Error('Cannot reach the server. Is the frontend dev server running?');
+  }
+
+  let body = null;
+  try {
+    body = await response.json();
+  } catch {
+    // Not JSON (e.g. the proxy's own error page); keep body as null
+  }
+
+  if (!response.ok) {
+    if (body === null && response.status >= 500) {
+      throw new Error('Cannot reach the backend. Is the API running on port 5000?');
+    }
+    const detail = body?.error || body?.message || response.statusText;
+    throw new Error(`Request failed (${response.status}): ${detail}`);
+  }
+
+  return body;
+}
+
+export function fetchProperties(params = {}) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') {
+      query.append(key, value);
+    }
+  }
+  const queryString = query.toString();
+  return request(`/api/properties${queryString ? `?${queryString}` : ''}`);
+}
+
+export function fetchPropertyDetail(id) {
+  return request(`/api/properties/${encodeURIComponent(id)}`);
+}
+```
+
+**`request(path)` — the shared helper (the waiter)**
+| Code | Plain English |
+|---|---|
+| `await fetch(path)` | Send the request. `fetch` = the browser's built-in "send a request" tool. |
+| first `catch` | Only runs when there's **no answer at all** (e.g. the dev server is off). |
+| `response.json()` in its own `try` | Turn the answer into data; if it isn't JSON, keep `null` instead of crashing. |
+| `!response.ok` | "The server answered, but with an error." See the traffic-light table below. |
+| `body === null && status >= 500` | A 5xx with **no JSON** comes from the proxy, not Express (Express always sends JSON) → the backend is unreachable. |
+| `body?.error \|\| body?.message` | Use the backend's own message. `?.` = "if `body` exists, read this; otherwise `undefined` — don't crash". `error` comes from my routes, `message` from my 404 handler. |
+| `throw new Error(...)` | Stop and hand back a clear sentence the page can show. |
+
+**`fetchProperties(params)` / `fetchPropertyDetail(id)`**
+| Code | Plain English |
+|---|---|
+| `URLSearchParams` | Builds `?city=Los+Angeles&beds=3` safely (handles spaces and symbols). |
+| `Object.entries(params)` | `{ city: 'Irvine', beds: 3 }` → `[['city','Irvine'], ['beds',3]]` |
+| skip `''`, `null`, `undefined` | An empty search box doesn't send `?city=`. |
+| `beds`, `offset` | The names the backend really reads (`backend/routes/properties.js:21`) — fixes the old `bedrooms`/`page` bug. |
+| `encodeURIComponent(id)` | Makes the ID URL-safe: `12/34` → `12%2F34`, so it can't add an extra `/`. |
+| `export` | Other files may use this function. `request` isn't exported — it's private to this file. |
+
+### What I learned: `fetch` does NOT throw on 404 or 500
+`fetch` only throws when there is **no response at all**. If the server answers with
+an error, `fetch` succeeds — you must check `response.ok` yourself.
+Comparison: you get a reply letter — the post worked, but you still have to open it
+and read whether it says "rejected".
+
+**`ok` means "was it OK?"** — real output from my backend:
+
+| ID | Status | `response.ok` | Light |
+|---|---|---|---|
+| `1118381441` | 200 | **true** | 🟢 found it |
+| `999999999` | 404 | **false** | 🔴 not found |
+| `abc123` | 400 | **false** | 🔴 bad ID |
+| (MySQL down) | 500 | **false** | 🔴 server problem |
+
+**Rule:** only **200–299** is OK (`true`). Every error code is `false`.
+`response.ok` asks "did it work?"; `!response.ok` (with `!` = not) asks "did it go wrong?".
+
+| What happened | `fetch` throws? | `response.ok` | Caught by |
+|---|---|---|---|
+| 200 | no | true | — data is returned |
+| 400 / 404 / 500 | **no** | false | `if (!response.ok)` |
+| No server at all | **yes** | (no response) | the first `catch` |
+
+### Test
+A throwaway test script (outside the project) called the real functions through the
+proxy on port 3000. Lint check (`npx oxlint`) → no problems.
+
+| # | Call | Sent | Result |
+|---|---|---|---|
+| 1 | `fetchProperties({ limit: 2 })` | `?limit=2` | ✅ total 55,212, 2 results |
+| 2 | LA, ≥ $300k, ≥ 3 beds | `?city=Los+Angeles&minPrice=300000&beds=3` | ✅ total 2,468 (same as Week 4) |
+| 3 | `{ city: '', beds: 3 }` | `?beds=3` | ✅ empty city skipped (total 39,661) |
+| 4 | `fetchPropertyDetail('1118381441')` | `/1118381441` | ✅ 349 E Gobind Blvd, 126 columns |
+| 5 | `fetchPropertyDetail('999999999')` | `/999999999` | ✅ `Request failed (404): No property found with listing ID 999999999. Check the ID and try again.` |
+| 6 | `fetchPropertyDetail('abc123')` | `/abc123` | ✅ `Request failed (400): Invalid listing ID…` |
+| 7 | `fetchProperties({ limit: 500 })` | `?limit=500` | ✅ `Request failed (400): limit must be an integer between 1 and 100` |
+| 8 | `fetchPropertyDetail('12/34')` | `/12%2F34` | ✅ slash encoded → backend 400 |
+| 9 | Nothing running (port 3999) | | ✅ `Cannot reach the server. Is the frontend dev server running?` |
+
+**Not tested yet:** "Cannot reach the backend…" (Vite running, Express stopped) —
+saved for Step 8.
+
+### Check questions
+- **Q:** The backend answers `abc123` with a 400. Which line notices the problem even
+  though the server answered? **A:** `if (!response.ok)` — `ok` is false for 400.
+- **Q:** 200 → `response.ok`? **A:** true. **404?** false. **500?** false.
+
+---
+
 ## Problems we hit
 | Problem | Cause | Fix / lesson |
 |---|---|---|
@@ -292,11 +425,19 @@ The page itself still shows "0 Total" — the old `App.jsx` gets fixed in steps 
 - **How do you know the move didn't break anything?** Re-ran the Week 4 curl tests
   from the new folder — identical results.
 - **Why commit the old frontend before changing it?** A clear before/after in the PR.
+- **What does an API client do?** It's the one file that talks to the backend: builds
+  the request, checks for errors, and gives components data or a clear error message.
+- **Why not use `fetch` directly in components?** All error handling lives in one
+  place; if the API changes, I fix one file.
+- **Does `fetch` throw an error on a 404?** No — only when there's no response at all.
+  For 404/500 you must check `response.ok`.
+- **How do you tell "backend down" from a normal 500?** Through the proxy, "backend
+  down" is a 5xx with no JSON body; my Express 500s always have a JSON `error`.
 
 ---
 
 ## Still to do / ask
-- Commit Step 1, then Step 2 (API client).
+- Step 8: test "Cannot reach the backend" (stop the backend — ask first).
 - Confirm which column holds square feet (`LM_Int2_3` looks likely, e.g. 3,677).
 - Debug challenge (`L_Photos`).
 - Update `CLAUDE.md` paths: notes are now in `docs/week-N.md`, README is `README.md`
