@@ -79,7 +79,7 @@ only part that knows the database password, checks every request, and decides wh
 │   ├── jest.config.js, jest.setup.js    # Jest settings (pretend browser page, extra checks)
 │   ├── babel.config.cjs                 # Lets Jest read JSX (Vite doesn't use it)
 │   └── package.json
-├── docs/                    # Weekly notes (week-1.md … week-5.md), milestone-log.md, images/
+├── docs/                    # Weekly notes (week-1.md … week-6.md), milestone-log.md, images/
 ├── README.md
 └── .gitignore               # Keeps .env and node_modules out of git (for every folder)
 ```
@@ -325,7 +325,7 @@ values; there is **no foreign key** enforcing it (see Known issues).
 - [x] **Week 3** — Property search: filters, pagination, validation, indexes ([notes](docs/week-3.md))
 - [x] **Week 4** — Property detail and open house endpoints, request logging, error handling ([notes](docs/week-4.md))
 - [x] **Week 5** — React frontend: property grid, API client, loading/error states, safe photo parsing ([notes](docs/week-5.md))
-- [ ] **Week 6**
+- [ ] **Week 6** — Filters UI + first unit tests ([notes](docs/week-6.md))
 - [ ] **Week 7**
 - [ ] **Week 8**
 - [ ] **Week 9**
