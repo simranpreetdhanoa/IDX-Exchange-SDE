@@ -1,6 +1,6 @@
 /* Listings page (Week 5) */
 .listings-page { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
-.listings-title { margin: 0 0 4px; font-size: 1.8rem; color: #0f172a; }
+.listings-title { margin: 0 0 16px; font-size: 1.8rem; color: #0f172a; }
 .listings-count { margin: 0 0 20px; color: #64748b; }
 
 /* The grid: as many 260px+ columns as fit, each sharing the leftover space */
@@ -18,3 +18,7 @@
   border-radius: 8px;
   padding: 16px;
 }
+
+/* Week 6: friendly "no results" box */
+.listings-empty { background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 24px 16px; }
+.listings-empty p { margin: 4px 0; }

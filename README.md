@@ -4,7 +4,8 @@ A Zillow/Redfin-style property search app built on real MLS (Multiple Listing Se
 This repository contains:
 - the **backend** (in `backend/`): a REST API that lets you search California property listings by
   city, ZIP code, price, bedrooms and bathrooms, view a single property, and see its upcoming open houses
-- the **frontend** (in `frontend/`): a React app that shows the listings as a grid of property cards
+- the **frontend** (in `frontend/`): a React app that shows the listings as a grid of property cards,
+  with a filter form (city, ZIP code, price range, beds, baths) and a Clear Filters button
 
 ---
 
@@ -12,6 +13,9 @@ This repository contains:
 
 ![Property grid](docs/images/listings-grid.png)
 *The listings page: 20 property cards with photo, price, address, city/state, beds, baths and sqft.*
+
+![Filters](docs/images/week6-filters.png)
+*Filters: Irvine, 92618, $500k–$2M, 3+ beds, 2+ baths → 143 results.*
 
 ---
 
@@ -71,15 +75,17 @@ only part that knows the database password, checks every request, and decides wh
 │   ├── src/
 │   │   ├── api/client.js                # All calls to the backend; throws clear errors (+ client.test.js)
 │   │   ├── utils/property.js            # Safe formatting + photo parsing (+ property.test.js)
+│   │   ├── utils/filters.js             # EMPTY_FILTERS + removeEmptyFilters (+ filters.test.js)
 │   │   ├── components/PropertyCard.jsx  # One property card; .css: hover effect (+ PropertyCard.test.jsx)
-│   │   ├── pages/ListingsPage.jsx       # Loading, error, count, grid (+ ListingsPage.test.jsx)
+│   │   ├── components/PropertyFilters.jsx  # The six-input form + Search / Clear (+ PropertyFilters.test.jsx)
+│   │   ├── pages/ListingsPage.jsx       # Filters, loading, error, count, "no results", grid (+ ListingsPage.test.jsx)
 │   │   ├── App.jsx                      # Shows ListingsPage
 │   │   └── main.jsx                     # Starts React
 │   ├── vite.config.js                   # Port 3000 + /api proxy
 │   ├── jest.config.js, jest.setup.js    # Jest settings (pretend browser page, extra checks)
 │   ├── babel.config.cjs                 # Lets Jest read JSX (Vite doesn't use it)
 │   └── package.json
-├── docs/                    # Weekly notes (week-1.md … week-5.md), milestone-log.md, images/
+├── docs/                    # Weekly notes (week-1.md … week-6.md), milestone-log.md, images/
 ├── README.md
 └── .gitignore               # Keeps .env and node_modules out of git (for every folder)
 ```
@@ -168,6 +174,9 @@ npm run dev
 Open **http://localhost:3000**. You should see "Showing 20 of 55,212 properties" and a grid of cards.
 If the API isn't running, the page shows: *"Couldn't load properties. Cannot reach the backend…"*
 
+Try the filters: type a city (e.g. `Irvine`) and click **Search** → "Showing 20 of 723 properties".
+**Clear Filters** empties the form and shows all 55,212 again.
+
 ---
 
 ## 🧪 Testing
@@ -177,7 +186,7 @@ Both parts have automatic tests that run with `npm test` (the tools from the int
 | Part | Tools | Tests | What they check |
 |---|---|---|---|
 | Backend | Jest + Supertest | 14 | Every endpoint: health, property (200/404/400), open houses, search filters and validation, unknown routes |
-| Frontend | Jest + React Testing Library | 57 | Photo parsing and formatting, the API client's error messages, the property card, and the listings page (loading, error, count) |
+| Frontend | Jest + React Testing Library | 73 | Photo parsing and formatting, the API client's error messages, the property card, the filter form and filter helpers, and the listings page (loading, error, count, Search/Clear, answers arriving out of order) |
 
 ```bash
 # backend — MySQL (Docker) must be running; the tests use the real database
@@ -188,7 +197,7 @@ npm test
 cd frontend
 npm test
 ```
-Expected: `Tests: 14 passed, 14 total` and `Tests: 57 passed, 57 total`.
+Expected: `Tests: 14 passed, 14 total` and `Tests: 73 passed, 73 total`.
 
 > The backend test output starts with a harmless `console.error` box: it's dotenv's
 > "injected env from .env" message, not a failing test.
@@ -325,7 +334,7 @@ values; there is **no foreign key** enforcing it (see Known issues).
 - [x] **Week 3** — Property search: filters, pagination, validation, indexes ([notes](docs/week-3.md))
 - [x] **Week 4** — Property detail and open house endpoints, request logging, error handling ([notes](docs/week-4.md))
 - [x] **Week 5** — React frontend: property grid, API client, loading/error states, safe photo parsing ([notes](docs/week-5.md))
-- [ ] **Week 6**
+- [x] **Week 6** — Filters UI: PropertyFilters form, search and clear, "no results" message, race-condition fix, first unit tests ([notes](docs/week-6.md))
 - [ ] **Week 7**
 - [ ] **Week 8**
 - [ ] **Week 9**
@@ -348,6 +357,8 @@ The detailed command log from Weeks 1–3 is in [docs/milestone-log.md](docs/mil
   listings (e.g. `1118381441`). A separate test database would make them independent.
 - **`npm audit` warnings:** mostly from the old **nodemon 1.14.10** in the backend; a few from the
   frontend's test packages (development-only).
+- **Min price > max price** is only checked by the server (400 error shown in red); the form doesn't
+  check it before sending.
 - **Not covered by automatic tests:** the hover effect and running on port 3000 (checked by hand in a browser).
 - **`backend/sql/indexes.sql` doesn't run as-is on MySQL 8:** it uses `CREATE INDEX IF NOT EXISTS` and doesn't
   turn off strict mode first (see setup step 5 for the workaround).
@@ -363,7 +374,9 @@ The detailed command log from Weeks 1–3 is in [docs/milestone-log.md](docs/mil
 - Return plain dates (`dateStrings` option in `db.js`).
 - Clean up orphan open houses and duplicates, convert `rets_openhouse` to InnoDB, add a foreign key.
 - Use one consistent error format and hide internal error details in `/api/health`.
-- Add pagination, search filters and a property detail page to the frontend.
+- Add pagination and a property detail page to the frontend.
+- Check min price > max price in the filter form before calling the API.
+- Put the filters in the URL (e.g. `?city=Irvine`) so a search can be shared or bookmarked.
 - Upgrade nodemon to clear the `npm audit` warnings.
 - Use a separate test database for the backend tests.
 - Remove unused template files (`lucide-react`, `hero.png`, logo `.svg`s).

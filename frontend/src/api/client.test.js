@@ -26,6 +26,14 @@ describe('fetchProperties', () => {
     expect(fetch).toHaveBeenCalledWith('/api/properties?city=Los+Angeles&beds=3');
   });
 
+  test('sends all six filters together (Week 6 filter form)', async () => {
+    fetch.mockResolvedValue(fakeResponse(200, { total: 0, results: [] }));
+    await fetchProperties({ city: 'Irvine', zipcode: '92618', minPrice: '500000', maxPrice: '900000', beds: '3', baths: '2' });
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/properties?city=Irvine&zipcode=92618&minPrice=500000&maxPrice=900000&beds=3&baths=2',
+    );
+  });
+
   test('calls /api/properties with no "?" when there are no params', async () => {
     fetch.mockResolvedValue(fakeResponse(200, { total: 0, results: [] }));
     await fetchProperties();

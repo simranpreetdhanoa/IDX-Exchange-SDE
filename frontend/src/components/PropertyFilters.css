@@ -1,0 +1,22 @@
+/* Filter form (Week 6): inputs in a row that wraps on small screens */
+.filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 12px;
+  align-items: end;
+  margin: 0 0 20px;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+.filters label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: #475569; }
+.filters input,
+.filters select { padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.95rem; background: #fff; }
+
+.filters-buttons { display: flex; gap: 8px; grid-column: span 2; } /* two buttons need two columns */
+.filters-buttons button { flex: 1; padding: 9px 12px; border-radius: 6px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.filters-search { border: 0; background: #2563eb; color: #fff; }
+.filters-search:hover { background: #1d4ed8; }
+.filters-clear { border: 1px solid #cbd5e1; background: #fff; color: #334155; }
+.filters-clear:hover { background: #f1f5f9; }
