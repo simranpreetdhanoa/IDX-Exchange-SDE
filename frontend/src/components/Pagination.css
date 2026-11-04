@@ -1,0 +1,33 @@
+/* Page controls (Week 7): a centered row that wraps on small screens */
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  margin: 28px 0 8px;
+}
+
+.pagination-button {
+  min-width: 40px;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #334155;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.pagination-button:hover:not(:disabled) { background: #f1f5f9; }
+.pagination-button:disabled { color: #94a3b8; cursor: not-allowed; }
+
+/* The current page is disabled too, but must stand out instead of looking greyed out */
+.pagination-button.pagination-current {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #fff;
+  font-weight: 600;
+  cursor: default;
+}
+
+.pagination-ellipsis { padding: 0 4px; color: #64748b; }
