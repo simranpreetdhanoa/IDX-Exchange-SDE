@@ -1,0 +1,50 @@
+/* Full-screen photo viewer (Week 8) */
+
+/* position: fixed sticks it to the SCREEN (not the page), so it covers everything even after scrolling */
+.lightbox {
+  position: fixed;
+  inset: 0; /* top, right, bottom and left all 0 = the whole screen */
+  z-index: 1000; /* on top of everything else */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 6, 23, 0.92);
+}
+
+/* The photo: as big as fits, without cropping */
+.lightbox-photo {
+  max-width: 90vw; /* vw/vh = % of the screen's width/height */
+  max-height: 85vh;
+  object-fit: contain;
+  border-radius: 6px;
+  cursor: default;
+}
+
+.lightbox-close,
+.lightbox-arrow {
+  position: absolute;
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+  line-height: 1;
+}
+.lightbox-close:hover,
+.lightbox-arrow:hover { background: rgba(255, 255, 255, 0.25); }
+.lightbox-close:focus-visible,
+.lightbox-arrow:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+.lightbox-close { top: 16px; right: 16px; width: 44px; height: 44px; border-radius: 50%; font-size: 30px; }
+
+.lightbox-arrow { top: 50%; transform: translateY(-50%); width: 52px; height: 52px; border-radius: 50%; font-size: 34px; }
+.lightbox-prev { left: 16px; }
+.lightbox-next { right: 16px; }
+
+.lightbox-counter {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #e2e8f0;
+  font-size: 14px;
+}

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { fetchPropertyDetail } from '../api/client';
+import PropertyImageGallery from '../components/PropertyImageGallery';
 import {
+  getPhotos,
   formatPrice,
   formatAddress,
   formatCityState,
@@ -43,8 +45,9 @@ export default function PropertyDetailPage() {
   }, [id]);
 
   const backLink = (
-    <Link className="detail-back" to="/">
-      ← Back to listings
+    // Short visible text; aria-label tells screen-reader users where it goes
+    <Link className="detail-back" to="/" aria-label="Back to listings">
+      ← Back
     </Link>
   );
 
@@ -89,12 +92,20 @@ export default function PropertyDetailPage() {
 
   const description = typeof property.L_Remarks === 'string' ? property.L_Remarks.trim() : '';
 
+  const address = formatAddress(property.L_Address);
+
   return (
     <section className="detail-page">
       {backLink}
+      {/* key: a different home gets a fresh gallery (starts at photo 1, forgets the old broken photos) */}
+      <PropertyImageGallery
+        key={property.L_ListingID}
+        photos={getPhotos(property.L_Photos)}
+        alt={`Photo of ${address}`}
+      />
       <header className="detail-header">
         <p className="detail-price">{formatPrice(property.L_SystemPrice)}</p>
-        <h1 className="detail-address">{formatAddress(property.L_Address)}</h1>
+        <h1 className="detail-address">{address}</h1>
         <p className="detail-location">
           {formatCityState(property.L_City, property.L_State)} {property.L_Zip}
         </p>

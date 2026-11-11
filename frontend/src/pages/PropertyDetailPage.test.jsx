@@ -85,7 +85,7 @@ test('an invalid id shows an error and the Back link, not a crash', async () => 
   const alert = await screen.findByRole('alert');
   expect(alert).toHaveTextContent("Couldn't load this property.");
   expect(alert).toHaveTextContent('Invalid listing ID');
-  expect(screen.getByRole('link', { name: '← Back to listings' })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Back to listings' })).toBeInTheDocument();
 });
 
 test('a listing that does not exist shows the 404 message', async () => {
@@ -98,7 +98,7 @@ test('the Back link returns to the listings page', async () => {
   fetchPropertyDetail.mockResolvedValue(laurelWay);
   renderAt('1118422731');
   await screen.findByText('$3,950,000');
-  screen.getByRole('link', { name: '← Back to listings' }).click();
+  screen.getByRole('link', { name: 'Back to listings' }).click();
   expect(await screen.findByText('Listings page')).toBeInTheDocument();
 });
 
@@ -129,4 +129,32 @@ test('a home with no description or details shows a fallback and no empty list',
   renderAt('1');
   expect(await screen.findByText('No description provided.')).toBeInTheDocument();
   expect(screen.queryByRole('heading', { name: 'Property details' })).not.toBeInTheDocument();
+});
+
+// Week 8 (Step 6a): the gallery sits at the top of the detail page
+test('shows the photo gallery with the home\'s photos', async () => {
+  fetchPropertyDetail.mockResolvedValue({
+    ...laurelWay,
+    L_Photos: '["https://a.com/1.jpg","https://a.com/2.jpg"]',
+  });
+  renderAt('1118422731');
+  const mainPhoto = await screen.findByRole('img', { name: 'Photo of 1461 Laurel Way' });
+  expect(mainPhoto).toHaveAttribute('src', 'https://a.com/1.jpg');
+  expect(screen.getByRole('button', { name: 'Show photo 2' })).toBeInTheDocument();
+});
+
+test('a home without photos shows the gallery placeholder', async () => {
+  fetchPropertyDetail.mockResolvedValue({ ...laurelWay, L_Photos: '' });
+  renderAt('1118422731');
+  expect(await screen.findByText('No photos available')).toBeInTheDocument();
+});
+
+// The link shows "← Back"; screen readers hear "Back to listings"
+test('the Back link shows "← Back" and has a clear name for screen readers', async () => {
+  fetchPropertyDetail.mockResolvedValue(laurelWay);
+  renderAt('1118422731');
+  await screen.findByText('$3,950,000');
+  const back = screen.getByRole('link', { name: 'Back to listings' });
+  expect(back).toHaveTextContent('← Back');
+  expect(back).toHaveAttribute('href', '/');
 });
