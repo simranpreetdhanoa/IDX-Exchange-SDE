@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { fetchPropertyDetail } from '../api/client';
 import PropertyImageGallery from '../components/PropertyImageGallery';
+import OpenHouses from '../components/OpenHouses';
+import PropertyMap from '../components/PropertyMap';
 import {
   getPhotos,
   formatPrice,
@@ -146,6 +148,12 @@ export default function PropertyDetailPage() {
           </dl>
         </>
       )}
+
+      <h2 className="detail-heading">Open houses</h2>
+      <OpenHouses listingId={property.L_ListingID} />
+
+      <h2 className="detail-heading">Location</h2>
+      <PropertyMap latitude={property.LMD_MP_Latitude} longitude={property.LMD_MP_Longitude} address={address} />
     </section>
   );
 }

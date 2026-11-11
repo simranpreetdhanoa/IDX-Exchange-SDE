@@ -1,6 +1,6 @@
 // Tests for the API client: a pretend fetch (a "mock") lets us test every answer,
 // including "backend down", without the real backend.
-import { fetchProperties, fetchPropertyDetail } from './client';
+import { fetchProperties, fetchPropertyDetail, fetchOpenHouses } from './client';
 
 // Builds a pretend response like the one fetch returns
 function fakeResponse(status, body) {
@@ -98,5 +98,18 @@ describe('fetchPropertyDetail', () => {
     fetch.mockResolvedValue(fakeResponse(400, { error: 'Invalid listing ID' }));
     await expect(fetchPropertyDetail('12/34')).rejects.toThrow();
     expect(fetch).toHaveBeenCalledWith('/api/properties/12%2F34');
+  });
+});
+
+describe('fetchOpenHouses (Week 8)', () => {
+  test('calls /api/properties/:id/openhouses and returns the list', async () => {
+    fetch.mockResolvedValue(fakeResponse(200, [{ id: 1, OH_StartTime: '13:00:00' }]));
+    await expect(fetchOpenHouses('1175978785')).resolves.toEqual([{ id: 1, OH_StartTime: '13:00:00' }]);
+    expect(fetch).toHaveBeenCalledWith('/api/properties/1175978785/openhouses');
+  });
+
+  test('throws the backend message on an error', async () => {
+    fetch.mockResolvedValue(fakeResponse(404, { error: 'No property found with listing ID 999' }));
+    await expect(fetchOpenHouses('999')).rejects.toThrow('Request failed (404): No property found with listing ID 999');
   });
 });

@@ -2,7 +2,7 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import PropertyDetailPage from './PropertyDetailPage';
-import { fetchPropertyDetail } from '../api/client';
+import { fetchPropertyDetail, fetchOpenHouses } from '../api/client';
 
 jest.mock('../api/client'); // every function in client.js becomes a mock
 
@@ -30,6 +30,8 @@ const laurelWay = {
   View: 'CityLights,Coastline',
   ArchitecturalStyle: '', // empty: its row must be hidden
   DaysOnMarket: 245,
+  LMD_MP_Latitude: '34.099106000000000',
+  LMD_MP_Longitude: '-118.418132',
 };
 
 // Opens the detail page at /property/<id>, the same way the real app does
@@ -157,4 +159,23 @@ test('the Back link shows "← Back" and has a clear name for screen readers', a
   const back = screen.getByRole('link', { name: 'Back to listings' });
   expect(back).toHaveTextContent('← Back');
   expect(back).toHaveAttribute('href', '/');
+});
+
+test('shows a Location section with the map for the home (Week 8)', async () => {
+  fetchPropertyDetail.mockResolvedValue(laurelWay);
+  renderAt('1118422731');
+  expect(await screen.findByRole('heading', { name: 'Location' })).toBeInTheDocument();
+  expect(screen.getByTitle('Map of 1461 Laurel Way')).toHaveAttribute(
+    'src',
+    expect.stringContaining('q=34.099106%2C-118.418132')
+  );
+});
+
+test('shows an Open houses section for the home (Week 8)', async () => {
+  fetchPropertyDetail.mockResolvedValue(laurelWay);
+  fetchOpenHouses.mockResolvedValue([]);
+  renderAt('1118422731');
+  expect(await screen.findByRole('heading', { name: 'Open houses' })).toBeInTheDocument();
+  expect(await screen.findByText('No open houses scheduled')).toBeInTheDocument();
+  expect(fetchOpenHouses).toHaveBeenCalledWith('1118422731');
 });

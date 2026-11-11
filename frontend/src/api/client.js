@@ -47,3 +47,8 @@ export function fetchProperties(params = {}) {
 export function fetchPropertyDetail(id) {
   return request(`/api/properties/${encodeURIComponent(id)}`);
 }
+
+// Open houses for one property (Week 8). Returns a list; an empty list [] means none.
+export function fetchOpenHouses(id) {
+  return request(`/api/properties/${encodeURIComponent(id)}/openhouses`);
+}

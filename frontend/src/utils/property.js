@@ -103,3 +103,37 @@ export function formatDays(value) {
   if (days === null || days < 0 || !Number.isInteger(days)) return null;
   return days === 1 ? '1 day' : `${days.toLocaleString('en-US')} days`;
 }
+
+// Week 8 (map): ("34.099106000000000", "-118.418132") → { lat: 34.099106, lng: -118.418132 }
+// Missing, 0, or impossible (latitude beyond ±90, longitude beyond ±180) → null, so no map is drawn
+export function getCoordinates(latitude, longitude) {
+  const lat = toNumber(latitude);
+  const lng = toNumber(longitude);
+  if (lat === null || lng === null) return null;
+  if (lat === 0 || lng === 0) return null; // 0 means "unknown" in this data
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null; // not a place on Earth
+  return { lat, lng };
+}
+
+// Week 8 (open houses): "13:30:00" → "1:30 PM", "00:05:00" → "12:05 AM"; missing or not a time → null
+export function formatTime(value) {
+  const match = /^(\d{1,2}):(\d{2})/.exec(String(value ?? ''));
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = match[2];
+  if (hours > 23 || Number(minutes) > 59) return null;
+  const suffix = hours < 12 ? 'AM' : 'PM';
+  const hours12 = hours % 12 || 12; // 0 → 12 (midnight), 13 → 1
+  return `${hours12}:${minutes} ${suffix}`;
+}
+
+// Week 8 (open houses): "2026-09-20T07:00:00.000Z" → "Sun, Sep 20, 2026"; missing or not a date → null
+// MySQL sends "midnight in California" written in UTC (world time); new Date() turns it back into local time.
+// A plain "2026-09-20" is read as a local date (otherwise it would count as UTC midnight = the day before in California).
+export function formatOpenHouseDate(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const plain = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value));
+  const date = plain ? new Date(Number(plain[1]), Number(plain[2]) - 1, Number(plain[3])) : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+}

@@ -1,6 +1,9 @@
 // Tests for the property helpers (Week 5 debug challenge: L_Photos is not always valid JSON)
 import {
   getPhotos,
+  formatTime,
+  formatOpenHouseDate,
+  getCoordinates,
   getFirstPhoto,
   formatPrice,
   formatSqft,
@@ -198,5 +201,63 @@ describe('getPhotos', () => {
       'https://a.com/1.jpg',
       'https://a.com/2.jpg',
     ]);
+  });
+});
+
+// Week 8 (map): only real places on Earth get a map
+describe('getCoordinates', () => {
+  test('turns the database text into numbers', () => {
+    expect(getCoordinates('34.099106000000000', '-118.418132')).toEqual({ lat: 34.099106, lng: -118.418132 });
+    expect(getCoordinates(34.1, -118.4)).toEqual({ lat: 34.1, lng: -118.4 });
+  });
+
+  test('missing or not-a-number → null', () => {
+    expect(getCoordinates(null, -118.4)).toBeNull();
+    expect(getCoordinates(34.1, undefined)).toBeNull();
+    expect(getCoordinates('', '')).toBeNull();
+    expect(getCoordinates('abc', '-118.4')).toBeNull();
+  });
+
+  test('0 means unknown → null', () => {
+    expect(getCoordinates(0, 0)).toBeNull();
+    expect(getCoordinates('0.000000', '-118.4')).toBeNull();
+  });
+
+  test('impossible values → null (latitude 120 is in the real data)', () => {
+    expect(getCoordinates(120, -118.4)).toBeNull();
+    expect(getCoordinates(34.1, -200)).toBeNull();
+  });
+});
+
+// Week 8 (open houses)
+describe('formatTime', () => {
+  test('24-hour time from MySQL → 12-hour time with AM/PM', () => {
+    expect(formatTime('13:30:00')).toBe('1:30 PM');
+    expect(formatTime('09:05:00')).toBe('9:05 AM');
+    expect(formatTime('12:00:00')).toBe('12:00 PM'); // noon
+    expect(formatTime('00:15:00')).toBe('12:15 AM'); // just after midnight
+  });
+
+  test('missing or not a time → null', () => {
+    expect(formatTime(null)).toBeNull();
+    expect(formatTime('')).toBeNull();
+    expect(formatTime('soon')).toBeNull();
+    expect(formatTime('25:00:00')).toBeNull();
+  });
+});
+
+describe('formatOpenHouseDate', () => {
+  test('the date MySQL sends → a friendly date', () => {
+    expect(formatOpenHouseDate('2026-09-20T07:00:00.000Z')).toBe('Sun, Sep 20, 2026');
+  });
+
+  test('a plain date stays on the same day', () => {
+    expect(formatOpenHouseDate('2026-09-20')).toBe('Sun, Sep 20, 2026');
+  });
+
+  test('missing or not a date → null', () => {
+    expect(formatOpenHouseDate(null)).toBeNull();
+    expect(formatOpenHouseDate('')).toBeNull();
+    expect(formatOpenHouseDate('not a date')).toBeNull();
   });
 });

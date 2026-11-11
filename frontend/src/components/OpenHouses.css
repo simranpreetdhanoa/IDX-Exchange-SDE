@@ -1,0 +1,15 @@
+/* Open houses on the detail page (Week 8) */
+.open-houses { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+
+.open-house {
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #2563eb; /* blue stripe, like a calendar entry */
+  border-radius: 8px;
+  background: #f8fafc;
+}
+.open-house-when { margin: 0; color: #0f172a; }
+.open-house-remarks { margin: 6px 0 0; color: #334155; line-height: 1.5; white-space: pre-line; }
+
+.open-houses-status { margin: 0; color: #64748b; }
+.open-houses-error { color: #b91c1c; }
