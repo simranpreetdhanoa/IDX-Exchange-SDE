@@ -336,7 +336,7 @@ values; there is **no foreign key** enforcing it (see Known issues).
 - [x] **Week 5** — React frontend: property grid, API client, loading/error states, safe photo parsing ([notes](docs/week-5.md))
 - [x] **Week 6** — Filters UI: PropertyFilters form, search and clear, "no results" message, race-condition fix, first unit tests ([notes](docs/week-6.md))
 - [x] **Week 7** — Pagination: page controls with ellipsis, results summary, filters and pages working together, repeated page number fix, component tests ([notes](docs/week-7.md))
-- [ ] **Week 8**
+- [ ] **Week 8** — Property detail page: routing, photo carousel and gallery, map, open houses ([notes](docs/week-8.md))
 - [ ] **Week 9**
 - [ ] **Week 10**
 - [ ] **Week 11**
