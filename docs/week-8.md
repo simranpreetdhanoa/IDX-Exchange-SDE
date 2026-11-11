@@ -31,8 +31,8 @@ component, without changing the backend.
 | 3 | `PropertyDetailPage` + invalid ID error | ✅ 3a price, address, stats, errors · 3b description + details |
 | 4 | Shared `L_Photos` parsing helper | ✅ |
 | 5 | `PropertyImageCarousel` (`stopPropagation`) | ✅ + 2 bugs fixed (no-photo layout, broken photo links) |
-| 6 | `PropertyImageGallery` + lightbox | ⏳ |
-| 7 | Debug challenge 2: Escape key | ⏳ |
+| 6 | `PropertyImageGallery` + lightbox | ✅ 6a main photo, thumbnails, arrows · 6b lightbox |
+| 7 | Debug challenge 2: Escape key | ✅ solved with hints |
 | 8 | `PropertyMap` + Get Directions | ⏳ |
 | 9 | Open houses section | ⏳ |
 | 10 | Debug challenge 1: remarks in `all_data` | ⏳ |
@@ -283,6 +283,107 @@ photo, shown as "1 / 9". Like a clock: after 12 comes 1.
   photos, and the arrows disappear ✅. 582 Pasture Ave: grey box with the details underneath ✅. Clicking the photo opens
   the detail page ✅.
 
+## Step 6a — Photo gallery on the detail page (`frontend/src/components/PropertyImageGallery.jsx` + `.css`)
+**Why:** requirement 41: a main image and a thumbnail strip (the lightbox comes in 6b).
+
+**A shared custom hook, `frontend/src/hooks/usePhotoList.js`:** a **custom hook** is a function starting with `use` that holds
+React logic we want to reuse. Both the carousel and the gallery need "which photo is showing" and "skip broken photos", so
+that logic moved out of the carousel into `usePhotoList`. It returns `working`, `current`, `position`, `showNext`,
+`showPrevious`, `showPhoto(url)` and `markFailed(url)`.
+- **The bookmark points at a spot in the ORIGINAL list.** If that photo is broken, the hook looks forward (wrapping around) for
+  the next good one. Why not a spot in the working list, like the first carousel version? In the gallery **every thumbnail
+  loads**, so a thumbnail can fail while you look at another photo. The working list would get shorter and the bookmark would
+  point at a different photo: the main photo would jump. A test checks this can't happen.
+- After the move, all the existing carousel tests still passed, which shows the carousel behaves the same.
+
+**The gallery:**
+- A big main photo (420px, 260px on phones) with an "X / Y" counter.
+- A thumbnail strip: one small button per working photo. Clicking one makes it the main photo; the selected one has a blue
+  border and `aria-pressed="true"` (tells screen readers it's the chosen one).
+- The strip uses `display: flex` + `overflow-x: auto`, so it **scrolls sideways** (some homes have 75 photos), and
+  `flex: 0 0 auto` stops thumbnails from shrinking.
+- One photo → no strip and no counter. No photos → "No photos available". Broken thumbnails disappear.
+- On the detail page, `key={property.L_ListingID}` gives each home a fresh gallery (starts at photo 1).
+
+**Tested:**
+- **184 tests pass** (+8 gallery tests: start state, highlighted thumbnail, click a thumbnail, one photo, no photos, broken main
+  photo skipped, a broken thumbnail doesn't move the main photo, all broken → placeholder; +2 detail page tests). Lint is clean.
+- In Chrome: 1461 Laurel Way shows the main photo and thumbnails ✅; clicking the 4th thumbnail → main photo changes, blue
+  border, "4 / 9" ✅; 1117694056 (67 photos): the strip scrolls sideways ✅.
+
+### Extra (my idea): arrows on the main photo
+- **‹ ›** buttons on the big photo use the hook's `showPrevious` / `showNext`, so they wrap around like the carousel.
+- **The strip follows the selected thumbnail:** `useRef` gives a handle on the strip element (like a name tag), and
+  `useEffect(..., [current])` runs each time the main photo changes and calls `strip.scrollTo(...)` to put the selected
+  thumbnail in the middle. It scrolls only the strip, never the page.
+- The strip has `position: relative`, because a thumbnail's `offsetLeft` is measured from the nearest *positioned* parent;
+  without it the distance would be measured from further out and the strip would scroll too far.
+- Jest's pretend browser can't scroll, so the code skips scrolling when `scrollTo` doesn't exist; the test puts in a pretend
+  `scrollTo` (`jest.fn()`) and checks it's called.
+- **Tested:** 187 tests pass (+3). In Chrome: 1118422731: › three times → 2 / 9, 3 / 9, 4 / 9 and the blue border moves ✅;
+  1117694056 (67 photos): › fifteen times → the strip slides along and the selected thumbnail stays visible ✅.
+
+## Step 6b — Lightbox (`frontend/src/components/PhotoLightbox.jsx` + `.css`)
+**Why:** requirement 41 and the acceptance criteria: clicking the main image opens a full-screen **lightbox** (a dark
+full-screen view of one photo, like dimming the cinema lights); it closes on a click outside or Escape; arrows change photos.
+
+**The code:**
+- `PropertyImageGallery.jsx` has `const [lightboxOpen, setLightboxOpen] = useState(false)`. Clicking the main photo (🔍
+  `cursor: zoom-in`) sets it to `true`, and the gallery shows `<PhotoLightbox … />`.
+- The lightbox gets the **same hook values** as the gallery (`current`, `position`, `showNext`, `showPrevious`,
+  `markFailed`), so it opens on the gallery's photo and the gallery is on the last photo you saw when it closes.
+- **Click outside closes it:** the dark `<div>` covers the screen (`position: fixed; inset: 0`) and has `onClick={onClose}`.
+  The photo and the ‹ › buttons use `stopPropagation`, so their clicks don't reach the dark background.
+- `role="dialog"` + `aria-modal="true"` tell screen readers a pop-up window is open.
+- `onKeyDown` on the dark `<div>` handles Escape, ← and → (it didn't work at first: see Step 7).
+
+**Tested:**
+- **196 tests pass** (+9 lightbox tests: closed at first, opens on the same photo, ‹ › change the photo and don't close it,
+  × closes it, outside click closes it, photo click doesn't, the gallery shows the last photo after closing, single photo,
+  broken photo skipped). Lint is clean.
+- In Chrome on 1118422731: the big photo opens the lightbox with ×, ‹ › and 1 / 9 ✅; › twice → 3 / 9, still open ✅; clicking
+  the photo keeps it open ✅; clicking the dark area closes it and the gallery shows 3 / 9 ✅.
+
+## Step 7 — Debug challenge 2 🐛: the lightbox doesn't close on Escape (`frontend/src/components/PhotoLightbox.jsx`)
+**The bug:** open the lightbox, press Escape → nothing happens. The `onKeyDown` handler is attached, and the code inside it is
+fine, but it **never runs**.
+
+**How I found the cause (hint by hint):**
+1. **Which element gets the key press?** In Chrome's Console, `document.activeElement` showed **`<body>`**: the browser's
+   **focus** (the one element that receives key presses) was on the whole page, not on the lightbox.
+2. A key press starts at the focused element and **bubbles up** to its parents, never down. The lightbox `<div>` is *inside*
+   `<body>`, so the Escape press never reached it.
+3. **Which elements can take focus?** A Console listener (`focusin`) printed what got focus while pressing Tab: only
+   **`A`** (links) and **`BUTTON`**. A plain `<div>` can't take focus.
+4. Searched "make a div focusable" → the **`tabindex`** attribute. In React (camelCase): **`tabIndex`**.
+5. Value: `0` = focusable and reachable with Tab; **`-1`** = focusable only from code. The dark background doesn't need to be
+   a Tab stop, so **`tabIndex={-1}`**.
+6. **Tested in Chrome:** Escape straight after opening still did nothing, but after clicking the photo inside the lightbox,
+   Escape worked. So the `<div>` was now *allowed* focus, but nothing *gave* it focus when it opened.
+7. **Gave it the focus:** the same tools as the thumbnail strip: `useRef` (a handle on the `<div>`) + `useEffect(..., [])`
+   (run once, right after the lightbox appears) → `lightboxRef.current.focus()`.
+
+**The fix:**
+```jsx
+const lightboxRef = useRef(null);
+useEffect(() => {
+  lightboxRef.current.focus();   // GIVES the div the focus when the lightbox opens
+}, []);
+...
+<div ref={lightboxRef} ... onKeyDown={handleKeyDown} tabIndex={-1}>   // tabIndex ALLOWS the div to have focus
+```
+
+**Tested:**
+- **+4 keyboard tests:** the lightbox has the focus when it opens; Escape closes it; → / ← change photos and wrap; other keys
+  do nothing. The test presses keys on `document.activeElement`, like a real keyboard.
+- **Proof:** with the fix removed, **3 of these tests failed**; with it back, all passed.
+- In Chrome: Escape straight after opening closes the lightbox ✅; → → ← gives 2 / 9, 3 / 9, 2 / 9 ✅.
+
+### Small change (my request): "← Back to listings" → "← Back"
+- The link at the top of the detail page now shows **← Back**. `aria-label="Back to listings"` keeps the full meaning for
+  screen-reader users (it still contains "Back", so it matches what sighted users see).
+- **201 tests pass** (+1 test: visible text "← Back", screen-reader name "Back to listings", goes to `/`).
+
 ## Problems we hit
 | Problem | Cause | Fix |
 |---|---|---|
@@ -293,6 +394,7 @@ photo, shown as "1 / 9". Like a clock: after 12 comes 1.
 | Chrome still used version 8 | Vite's cache | `npm run dev -- --force` |
 | No-photo cards hid their details | `height: 100%` meant the whole card | Placeholder inside the 200px box |
 | Most photos of some homes were grey boxes | 28% of page 1's photo links are 404 "Media record not found!" | Carousel skips failed photos |
+| Lightbox ignored Escape (debug challenge 2) | Focus was on `<body>`; a plain `<div>` can't take focus | `tabIndex={-1}` + `.focus()` on open |
 
 ## Questions my supervisor may ask
 - **Why React Router?** → Each home gets its own address; Back, refresh and sharing links work.
@@ -323,7 +425,18 @@ photo, shown as "1 / 9". Like a clock: after 12 comes 1.
 - **Why are photos missing?** → The provider deleted old photos after those homes updated theirs, but our database still has
   the old links (404 "Media record not found!"). The frontend skips them; the data needs refreshing.
 
+- **What's a custom hook?** → A function starting with `use` that holds reusable React logic; `usePhotoList` serves the
+  carousel and the gallery.
+
+- **What does `useRef` do?** → Gives a direct handle on a page element; we use it to scroll the thumbnail strip.
+
+- **Why didn't Escape work?** → Key presses go to the focused element. A plain `<div>` can't take focus, so its `onKeyDown`
+  never ran. `tabIndex={-1}` allows focus; `useRef` + `useEffect` call `.focus()` when the lightbox opens.
+- **Why `-1` and not `0`?** → `0` would add the dark background as a Tab stop; it only needs focus from our code.
+- **Why does the Back link have an `aria-label`?** → The visible text is short; the label tells screen-reader users where it goes.
+
 ## Still to do / ask
+- Keyboard ← / → on the gallery itself (not just the lightbox) — possible follow-up using the same `tabIndex` idea.
 - **Ask:** can the photo links be refreshed from the provider? 157 of 552 links on page 1 (28%) are 404.
 - Back from a detail page returns to listings page 1 (page number isn't kept in the address).
 - `npm audit` reports moderate warnings in test tools (`deepmerge`, `glob`, `minimatch`, used by Jest). These are not
