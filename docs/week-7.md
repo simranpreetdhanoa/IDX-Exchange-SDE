@@ -26,7 +26,98 @@ it, then fix the page number logic.
 | 3 | Connect it to `ListingsPage` and tests | ✅ |
 | 4 | Check with real data in real Chrome | ✅ |
 | 5 | Notes | ✅ |
-| 6 | Commit and pull request | ⬜ waiting for my OK |
+| 6 | Commit and pull request | ✅ Merged as pull request #8 |
+| 7 | Demo guide and README progress | ⬜ waiting for my OK to commit |
+
+---
+
+## Demo guide for my supervisor
+
+**Before the demo:** open Docker Desktop, run `docker start idx-mysql-local`, run `npm start` in `backend`, and run
+`npm run dev` in `frontend`. Then open http://localhost:3000. File paths below start from `frontend/src/`.
+
+### 1. Pagination controls appear below the property grid
+- **File to show:** `pages/ListingsPage.jsx`, line 89 (the grid) and line 95 (`<Pagination>`)
+- **What it does:** draws the page controls straight after the grid.
+- **Show in Chrome:** scroll to the bottom of the page. The row of buttons is under the homes.
+- **Say:** "The controls come right after the grid in the code, so they appear below the homes."
+
+### 2. Previous is disabled on page 1; Next is disabled on the last page
+- **File to show:** `components/Pagination.jsx`, line 16 (Previous) and line 44 (Next)
+- **What it does:** turns a button off when there is no page to go to in that direction.
+- **Show in Chrome:** on page 1, Previous is greyed out. Click **2761** and wait about 3 seconds: Next is greyed out.
+- **Say:** "Each button compares the current page with the first or last page. If they match, the button is disabled."
+
+### 3. Clicking a page number navigates to that page
+- **File to show:** `components/Pagination.jsx`, line 34, then `pages/ListingsPage.jsx`, line 58 (`goToPage`)
+- **What it does:** the button reports the page number, and the listings page saves it and fetches those homes.
+- **Show in Chrome:** click **5**. The summary changes to `Showing 81-100 of 55,212 properties`.
+- **Say:** "The button only reports the click. The listings page changes the current page, and that triggers the new fetch."
+
+### 4. Page numbers use ellipsis correctly for large counts
+- **File to show:** `utils/pagination.js`, lines 8–27 (the four cases)
+- **What it does:** chooses which page numbers to show, based on where the current page is.
+- **Show in Chrome:** the real list has 2,761 pages, so the row changes as you move:
+  - Page 1: `1 2 3 4 5 ... 2761`
+  - Page 5: `1 ... 4 5 6 ... 2761`
+  - Page 2761: `1 ... 2757 2758 2759 2760 2761`
+- **Say:** "There are four cases: all pages fit, near the start, in the middle, and near the end. With 24 pages, page 5 shows
+  `1 ... 4 5 6 ... 24`, and a test checks that."
+
+### 5. Results summary shows "Showing X-Y of Z properties"
+- **File to show:** `pages/ListingsPage.jsx`, line 87
+- **What it does:** works out the first and last home on the page, and shows the total.
+- **Show in Chrome:** page 1 says `Showing 1-20 of 55,212 properties`. The last page says `Showing 55,201-55,212 of 55,212 properties`.
+- **Say:** "The first number is the homes skipped plus one. The last number uses how many homes actually came back, so the last page
+  doesn't go past the total."
+
+### 6. Applying new filters resets to page 1
+- **File to show:** `pages/ListingsPage.jsx`, line 53
+- **What it does:** moves back to page 1 whenever a new search starts or the filters are cleared.
+- **Show in Chrome:** go to page 5, type `Irvine` in City, and click **Search**. It shows `Showing 1-20 of 723 properties`, with page 1 highlighted.
+- **Say:** "A new search can give a shorter list, so the old page might not exist. Going back to page 1 always works."
+
+### 7. Pagination is hidden when there is only one page
+- **File to show:** `components/Pagination.jsx`, line 7
+- **What it does:** draws nothing when there is one page or none.
+- **Show in Chrome:** click **Clear Filters**, type `100000000` in Min price, and click **Search**. It shows `Showing 1-5 of 5 properties` with no controls.
+- **Say:** "With only one page, the buttons would have nowhere to go, so the component returns `null`, which means draw nothing."
+
+### 8. All component tests pass
+- **Files to show:** `components/Pagination.test.jsx` and `utils/pagination.test.js`
+- **What it does:** clicks the buttons automatically and checks the results, using `fireEvent.click()`.
+- **Show in a terminal:** run `npm test` in `frontend`. It should end with `Tests: 106 passed, 106 total`.
+- **Say:** "The tests cover the first, last and middle pages, clicking a page number, and ellipsis rendering, so I'll know if a later change breaks them."
+
+### Also from the requirements: changing pages scrolls to the top and keeps filters
+- **File to show:** `pages/ListingsPage.jsx`, lines 58–62 (`goToPage`)
+- **What it does:** changes the page and scrolls up, without touching the saved filters.
+- **Show in Chrome:** search `Irvine`, scroll down, and click **5**. The screen jumps to the top, it shows `Showing 81-100 of 723 properties`, and the homes are still in Irvine.
+- **Say:** "Changing page only moves the current page. The filters are stored separately in `search`, so they stay on."
+
+### Debug challenge
+| Input | Simple first version showed | Now shows |
+|---|---|---|
+| Page 23 of 24 | `1 ... 22 23 24 ... 24` | `1 ... 20 21 22 23 24` |
+| Page 24 of 24 | `1 ... 23 24 25 ... 24` | `1 ... 20 21 22 23 24` |
+| Page 1 of 5 | `1 ... 0 1 2 ... 5` | `1 2 3 4 5` |
+| Page 3 of 1 (the assignment's exact output) | `1 ... 2 3 4 ... 1` | `1` |
+
+- **Cause:** the first version built the same row every time, without checking where the current page was. Near the end, the page after the
+  current one was also the last page, so it appeared twice.
+- **Fix:** check the current page's position first, then use one of four cases: all pages fit, near the start, in the middle, or near the end.
+- **File to show:** `utils/pagination.js`, lines 8–27, and `utils/pagination.test.js`, lines 27–43
+- **Say:** "I wrote tests that showed the bug first: 6 of 10 failed. After the fix they passed, and one test now checks every page of every list
+  size from 1 to 30 pages."
+- **If asked:** the failing first version was only run locally and never committed, so it doesn't appear in the git history. The tests that catch it do.
+
+### Test results
+| Tests | Result | Notes |
+|---|---|---|
+| Frontend | ✅ 106 passed, 8 test suites | No database needed. 23 of these are in the two files above |
+| Backend | ✅ 14 passed, 1 test suite | Docker must be running. Without the database, 7 of them fail |
+| Lint | ✅ No problems | |
+| Real Chrome with real data | ✅ 26 of 26 checks passed | Details under "How we tested it" |
 
 ---
 
