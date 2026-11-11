@@ -1,0 +1,8 @@
+// to start the docker container, run the following command in the terminal
+// docker ps 
+//cd ~/Downloads/IDX/IDX-Exchange-SDE/backend
+// excess the my sql container by running the following command in the terminal
+// docker exec -it idx-mysql-local mysql -u root -p
+// to start backend and frontened server
+// npm run dev
+// for test npm test
