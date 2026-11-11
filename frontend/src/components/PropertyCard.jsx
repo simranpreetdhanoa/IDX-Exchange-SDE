@@ -1,34 +1,28 @@
-import { useState } from 'react';
+import { useNavigate } from 'react-router';
 import {
-  getFirstPhoto,
+  getPhotos,
   formatPrice,
   formatSqft,
   formatCount,
   formatAddress,
   formatCityState,
 } from '../utils/property';
+import PropertyImageCarousel from './PropertyImageCarousel';
 import './PropertyCard.css';
 
-// One property card (Week 5): photo, price, address, city/state, beds, baths, sqft
+// One property card (Week 5): photos (carousel, Week 8), price, address, city/state, beds, baths, sqft
 export default function PropertyCard({ property }) {
-  const photoUrl = getFirstPhoto(property.L_Photos);
-  // Debug challenge, protection B: some photo URLs lead to a 404 or a PDF
-  const [photoFailed, setPhotoFailed] = useState(false);
+  const navigate = useNavigate();
   const address = formatAddress(property.L_Address);
 
+  // Week 8: clicking the card opens this home's detail page
+  function openDetail() {
+    navigate(`/property/${property.L_ListingID}`);
+  }
+
   return (
-    <article className="property-card">
-      {photoUrl && !photoFailed ? (
-        <img
-          className="property-card-photo"
-          src={photoUrl}
-          alt={`Photo of ${address}`}
-          loading="lazy"
-          onError={() => setPhotoFailed(true)}
-        />
-      ) : (
-        <div className="property-card-photo property-card-placeholder">No photo available</div>
-      )}
+    <article className="property-card" onClick={openDetail}>
+      <PropertyImageCarousel photos={getPhotos(property.L_Photos)} alt={`Photo of ${address}`} />
 
       <div className="property-card-body">
         <p className="property-card-price">{formatPrice(property.L_SystemPrice)}</p>

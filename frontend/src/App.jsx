@@ -1,6 +1,14 @@
+import { Route, Routes } from 'react-router';
 import ListingsPage from './pages/ListingsPage';
+import PropertyDetailPage from './pages/PropertyDetailPage';
 
-// Week 5: the app is the listings page (the old all-in-one version is in git history, commit b193b17)
+// Week 8: the address decides which page to show
 export default function App() {
-  return <ListingsPage />;
+  return (
+    <Routes>
+      <Route path="/" element={<ListingsPage />} />
+      <Route path="/property/:id" element={<PropertyDetailPage />} />
+      <Route path="*" element={<p className="listings-status">Page not found.</p>} />
+    </Routes>
+  );
 }

@@ -1,5 +1,6 @@
 // ListingsPage tests: the API client is replaced by a mock, so no backend is needed
 import { render, screen, fireEvent, act } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import ListingsPage from './ListingsPage';
 import { fetchProperties } from '../api/client';
 
@@ -22,7 +23,7 @@ const twoHouses = {
 
 test('shows "Loading properties…" first, then the count and the cards', async () => {
   fetchProperties.mockResolvedValue(twoHouses);
-  render(<ListingsPage />);
+  render(<ListingsPage />, { wrapper: MemoryRouter });
   expect(screen.getByText('Loading properties…')).toBeInTheDocument();
 
   expect(await screen.findByText('Showing 1-2 of 55,212 properties')).toBeInTheDocument();
@@ -34,7 +35,7 @@ test('shows "Loading properties…" first, then the count and the cards', async 
 
 test('shows the error message when the backend is unreachable', async () => {
   fetchProperties.mockRejectedValue(new Error('Cannot reach the backend. Is the API running on port 5000?'));
-  render(<ListingsPage />);
+  render(<ListingsPage />, { wrapper: MemoryRouter });
   const alert = await screen.findByRole('alert');
   expect(alert).toHaveTextContent("Couldn't load properties. Cannot reach the backend. Is the API running on port 5000?");
   expect(screen.queryByRole('article')).not.toBeInTheDocument();
@@ -42,7 +43,7 @@ test('shows the error message when the backend is unreachable', async () => {
 
 test('shows a helpful message when there are no results', async () => {
   fetchProperties.mockResolvedValue({ total: 0, limit: 20, offset: 0, results: [] });
-  render(<ListingsPage />);
+  render(<ListingsPage />, { wrapper: MemoryRouter });
   expect(await screen.findByText('No properties found.')).toBeInTheDocument();
   expect(screen.getByText(/widen the price range/)).toBeInTheDocument();
   expect(screen.queryByRole('article')).not.toBeInTheDocument();
@@ -52,14 +53,14 @@ test('shows a helpful message when there are no results', async () => {
 
 test('shows the filter form above the grid', async () => {
   fetchProperties.mockResolvedValue(twoHouses);
-  render(<ListingsPage />);
+  render(<ListingsPage />, { wrapper: MemoryRouter });
   expect(screen.getByRole('form', { name: 'Property filters' })).toBeInTheDocument();
   expect(await screen.findAllByRole('article')).toHaveLength(2);
 });
 
 test('Search fetches with only the filled-in filters (empty ones are not sent)', async () => {
   fetchProperties.mockResolvedValue(twoHouses);
-  render(<ListingsPage />);
+  render(<ListingsPage />, { wrapper: MemoryRouter });
   await screen.findAllByRole('article');
 
   fireEvent.change(screen.getByLabelText('City'), { target: { value: ' Irvine ' } });
@@ -72,7 +73,7 @@ test('Search fetches with only the filled-in filters (empty ones are not sent)',
 
 test('Clear Filters empties the form and reloads all properties', async () => {
   fetchProperties.mockResolvedValue(twoHouses);
-  render(<ListingsPage />);
+  render(<ListingsPage />, { wrapper: MemoryRouter });
   await screen.findAllByRole('article');
 
   fireEvent.change(screen.getByLabelText('City'), { target: { value: 'Irvine' } });
@@ -89,7 +90,7 @@ test('Clear Filters empties the form and reloads all properties', async () => {
 test('keeps what the user typed when a search fails', async () => {
   fetchProperties.mockResolvedValueOnce(twoHouses);
   fetchProperties.mockRejectedValueOnce(new Error('Request failed (400): minPrice cannot be greater than maxPrice'));
-  render(<ListingsPage />);
+  render(<ListingsPage />, { wrapper: MemoryRouter });
   await screen.findAllByRole('article');
 
   fireEvent.change(screen.getByLabelText('Min price'), { target: { value: '900000' } });
@@ -113,7 +114,7 @@ test('ignores a slow old answer that arrives after a newer search (race conditio
     .mockReturnValueOnce(new Promise((resolve) => { answerClear = resolve; }))
     .mockReturnValueOnce(new Promise((resolve) => { answerIrvine = resolve; }));
 
-  render(<ListingsPage />);
+  render(<ListingsPage />, { wrapper: MemoryRouter });
   await screen.findAllByRole('article');
 
   fireEvent.click(screen.getByRole('button', { name: 'Clear Filters' })); // request A: all homes
@@ -144,7 +145,7 @@ function pageOf(total, { limit, offset }) {
 
 test('the controls appear below the property grid', async () => {
   fetchProperties.mockImplementation((params) => pageOf(50, params));
-  render(<ListingsPage />);
+  render(<ListingsPage />, { wrapper: MemoryRouter });
   await screen.findAllByRole('article');
 
   const grid = screen.getAllByRole('article')[0].parentElement;
@@ -154,7 +155,7 @@ test('the controls appear below the property grid', async () => {
 
 test('the summary shows the range of the current page', async () => {
   fetchProperties.mockImplementation((params) => pageOf(50, params));
-  render(<ListingsPage />);
+  render(<ListingsPage />, { wrapper: MemoryRouter });
   expect(await screen.findByText('Showing 1-20 of 50 properties')).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: 'Page 2' }));
@@ -163,7 +164,7 @@ test('the summary shows the range of the current page', async () => {
 
 test('the summary on a part-full last page stops at the total', async () => {
   fetchProperties.mockImplementation((params) => pageOf(50, params));
-  render(<ListingsPage />);
+  render(<ListingsPage />, { wrapper: MemoryRouter });
   await screen.findAllByRole('article');
 
   fireEvent.click(screen.getByRole('button', { name: 'Page 3' }));
@@ -173,7 +174,7 @@ test('the summary on a part-full last page stops at the total', async () => {
 
 test('changing page fetches the right offset and scrolls to the top', async () => {
   fetchProperties.mockImplementation((params) => pageOf(50, params));
-  render(<ListingsPage />);
+  render(<ListingsPage />, { wrapper: MemoryRouter });
   await screen.findAllByRole('article');
   expect(window.scrollTo).not.toHaveBeenCalled(); // not on the first load
 
@@ -186,7 +187,7 @@ test('changing page fetches the right offset and scrolls to the top', async () =
 
 test('changing page keeps the active filters', async () => {
   fetchProperties.mockImplementation((params) => pageOf(50, params));
-  render(<ListingsPage />);
+  render(<ListingsPage />, { wrapper: MemoryRouter });
   await screen.findAllByRole('article');
 
   fireEvent.change(screen.getByLabelText('City'), { target: { value: 'Irvine' } });
@@ -201,7 +202,7 @@ test('changing page keeps the active filters', async () => {
 
 test('changing page ignores text that was typed but not searched yet', async () => {
   fetchProperties.mockImplementation((params) => pageOf(50, params));
-  render(<ListingsPage />);
+  render(<ListingsPage />, { wrapper: MemoryRouter });
   await screen.findAllByRole('article');
 
   fireEvent.change(screen.getByLabelText('City'), { target: { value: 'Irvine' } });
@@ -213,7 +214,7 @@ test('changing page ignores text that was typed but not searched yet', async () 
 
 test('applying new filters goes back to page 1, with one request', async () => {
   fetchProperties.mockImplementation((params) => pageOf(50, params));
-  render(<ListingsPage />);
+  render(<ListingsPage />, { wrapper: MemoryRouter });
   await screen.findAllByRole('article');
   fireEvent.click(screen.getByRole('button', { name: 'Page 3' }));
   await screen.findByText('Showing 41-50 of 50 properties');
@@ -230,7 +231,7 @@ test('applying new filters goes back to page 1, with one request', async () => {
 
 test('Clear Filters also goes back to page 1', async () => {
   fetchProperties.mockImplementation((params) => pageOf(50, params));
-  render(<ListingsPage />);
+  render(<ListingsPage />, { wrapper: MemoryRouter });
   await screen.findAllByRole('article');
   fireEvent.click(screen.getByRole('button', { name: 'Page 3' }));
   await screen.findByText('Showing 41-50 of 50 properties');
@@ -243,7 +244,7 @@ test('Clear Filters also goes back to page 1', async () => {
 
 test('the controls are hidden when all the results fit on one page', async () => {
   fetchProperties.mockImplementation((params) => pageOf(20, params));
-  render(<ListingsPage />);
+  render(<ListingsPage />, { wrapper: MemoryRouter });
   expect(await screen.findByText('Showing 1-20 of 20 properties')).toBeInTheDocument();
   expect(screen.queryByRole('navigation', { name: 'Pagination' })).not.toBeInTheDocument();
 });
@@ -256,7 +257,7 @@ test('ignores a slow page that arrives after a newer page was chosen', async () 
     }
     return pageOf(50, params);
   });
-  render(<ListingsPage />);
+  render(<ListingsPage />, { wrapper: MemoryRouter });
   await screen.findAllByRole('article');
 
   fireEvent.click(screen.getByRole('button', { name: 'Page 2' })); // slow

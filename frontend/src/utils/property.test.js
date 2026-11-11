@@ -1,11 +1,16 @@
 // Tests for the property helpers (Week 5 debug challenge: L_Photos is not always valid JSON)
 import {
+  getPhotos,
   getFirstPhoto,
   formatPrice,
   formatSqft,
   formatCount,
   formatAddress,
   formatCityState,
+  formatYear,
+  formatFeatureList,
+  formatLotSize,
+  formatDays,
 } from './property';
 
 describe('getFirstPhoto', () => {
@@ -92,5 +97,106 @@ describe('formatCityState', () => {
     [' Irvine ', ' CA ', 'Irvine, CA'],
   ])('formatCityState(%p, %p) → %p', (city, state, expected) => {
     expect(formatCityState(city, state)).toBe(expected);
+  });
+});
+
+// Week 8: year built on the detail page
+describe('formatYear', () => {
+  test.each([
+    [1973, '1973'],
+    ['2005', '2005'],
+    [null, '—'],
+    [undefined, '—'],
+    ['', '—'],
+    [0, '—'],
+    [3025, '—'],
+    [1973.5, '—'],
+    ['abc', '—'],
+  ])('formatYear(%p) → %p', (value, expected) => {
+    expect(formatYear(value)).toBe(expected);
+  });
+});
+
+// Week 8: tidy CamelCase lists for the property details
+describe('formatFeatureList', () => {
+  test.each([
+    ['SingleFamilyResidence', 'Single Family Residence'],
+    ['CityLights,Coastline', 'City Lights, Coastline'],
+    [' Carpet , Tile ', 'Carpet, Tile'],
+    ['Central', 'Central'],
+    ['HOA', 'HOA'], // a run of capitals is left alone
+    ['Carpet,,', 'Carpet'],
+    ['', null],
+    [' , ', null],
+    [null, null],
+    [undefined, null],
+  ])('formatFeatureList(%p) → %p', (value, expected) => {
+    expect(formatFeatureList(value)).toBe(expected);
+  });
+});
+
+describe('formatLotSize', () => {
+  test.each([
+    [0.4261, '18562.00', '0.43 acres (18,562 sqft)'],
+    ['0.1220', null, '0.12 acres'],
+    [null, '5314.00', '5,314 sqft'],
+    [0.001, 50, '50 sqft'], // too small to show in acres
+    [null, null, null],
+    ['', '0', null],
+  ])('formatLotSize(%p, %p) → %p', (acres, sqft, expected) => {
+    expect(formatLotSize(acres, sqft)).toBe(expected);
+  });
+});
+
+describe('formatDays', () => {
+  test.each([
+    [245, '245 days'],
+    ['1', '1 day'],
+    [0, '0 days'],
+    [1500, '1,500 days'],
+    [-3, null],
+    [null, null],
+    ['', null],
+  ])('formatDays(%p) → %p', (value, expected) => {
+    expect(formatDays(value)).toBe(expected);
+  });
+});
+
+// Week 8: the list of photos for the carousel and the gallery
+describe('getPhotos', () => {
+  test('returns every URL of a valid JSON array, in order', () => {
+    expect(getPhotos('["https://a.com/1.jpg","https://a.com/2.jpg","https://a.com/3.jpg"]')).toEqual([
+      'https://a.com/1.jpg',
+      'https://a.com/2.jpg',
+      'https://a.com/3.jpg',
+    ]);
+  });
+
+  test('works with a single photo', () => {
+    expect(getPhotos('["https://a.com/only.jpg"]')).toEqual(['https://a.com/only.jpg']);
+  });
+
+  test('reads escaped slashes like the real data', () => {
+    expect(getPhotos('["https:\\/\\/a.com\\/1.jpg"]')).toEqual(['https://a.com/1.jpg']);
+  });
+
+  test.each([
+    ['empty text', ''],
+    ['only spaces', '   '],
+    ['null', null],
+    ['undefined', undefined],
+    ['broken JSON', '["https://a.com/1.jpg"'],
+    ['not a list', '{"url":"https://a.com/1.jpg"}'],
+    ['an empty list', '[]'],
+    ['a number', 42],
+  ])('%s → []', (_label, value) => {
+    expect(getPhotos(value)).toEqual([]);
+  });
+
+  test('skips blanks and non-text items, and trims spaces', () => {
+    expect(getPhotos('["", " https://a.com/1.jpg ", null, 7, "https://a.com/2.jpg"]')).toEqual([
+      'https://a.com/1.jpg',
+      'https://a.com/2.jpg',
+    ]);
   });
 });

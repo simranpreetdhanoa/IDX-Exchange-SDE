@@ -1,0 +1,45 @@
+/* Property detail page (Week 8) */
+.detail-page { max-width: 1000px; margin: 0 auto; padding: 24px 16px; }
+
+.detail-back { display: inline-block; margin-bottom: 16px; color: #2563eb; text-decoration: none; }
+.detail-back:hover { text-decoration: underline; }
+
+.detail-status { margin: 40px 0; text-align: center; color: #475569; }
+.detail-error {
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.detail-header { margin-bottom: 20px; }
+.detail-price { margin: 0; font-size: 2rem; font-weight: 700; color: #0f172a; }
+.detail-address { margin: 4px 0 0; font-size: 1.4rem; color: #0f172a; }
+.detail-location { margin: 4px 0 0; color: #64748b; }
+
+/* The 4 stats: boxes in a row that wrap onto two rows on narrow screens */
+.detail-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin: 0 0 24px;
+}
+.detail-stats div { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; }
+.detail-stats dt { font-size: 0.85rem; color: #64748b; }
+.detail-stats dd { margin: 4px 0 0; font-size: 1.2rem; font-weight: 600; color: #0f172a; }
+
+/* Week 8 (3b): description and the property details list */
+.detail-heading { margin: 28px 0 10px; font-size: 1.2rem; color: #0f172a; }
+.detail-description { margin: 0; line-height: 1.6; color: #334155; white-space: pre-line; } /* keep the agent's line breaks */
+
+.detail-list { margin: 0; border-top: 1px solid #e2e8f0; }
+.detail-list div {
+  display: grid;
+  grid-template-columns: minmax(140px, 220px) 1fr; /* label column, value column */
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+.detail-list dt { color: #64748b; }
+.detail-list dd { margin: 0; color: #0f172a; }
