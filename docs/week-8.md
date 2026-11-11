@@ -33,7 +33,7 @@ component, without changing the backend.
 | 5 | `PropertyImageCarousel` (`stopPropagation`) | ✅ + 2 bugs fixed (no-photo layout, broken photo links) |
 | 6 | `PropertyImageGallery` + lightbox | ✅ 6a main photo, thumbnails, arrows · 6b lightbox |
 | 7 | Debug challenge 2: Escape key | ✅ solved with hints |
-| 8 | `PropertyMap` + Get Directions | ⏳ |
+| 8 | `PropertyMap` + Get Directions | ✅ (real map appears once the key is in `.env`) |
 | 9 | Open houses section | ⏳ |
 | 10 | Debug challenge 1: remarks in `all_data` | ⏳ |
 | 11 | Check with real data in real Chrome | ⏳ |
@@ -384,6 +384,57 @@ useEffect(() => {
   screen-reader users (it still contains "Back", so it matches what sighted users see).
 - **201 tests pass** (+1 test: visible text "← Back", screen-reader name "Back to listings", goes to `/`).
 
+## Step 8 — Map and Get Directions (`frontend/src/components/PropertyMap.jsx` + `.css`)
+**What:** a **Location** section at the bottom of the detail page: a Google map of the home and a **Get Directions ↗** link.
+**How:** the **Google Maps Embed API** inside an **iframe** (a window on our page that shows another website). No npm package.
+
+```
+https://www.google.com/maps/embed/v1/place?key=KEY&q=LAT,LNG&zoom=15
+```
+
+**The location data first (all 55,212 homes):**
+| Location | Homes |
+|---|---|
+| Both `LMD_MP_Latitude` and `LMD_MP_Longitude` filled | 54,426 (98.6%) |
+| Missing (empty or 0), e.g. 1118381441 | 786 |
+| Impossible (latitude 120; the Earth only goes to ±90) | a few |
+| Possible but wrong (e.g. 35.37, 33.76 = Cyprus, not California) | a few, which code can't detect |
+
+**What the page shows:**
+| Situation | Shown |
+|---|---|
+| No usable location (missing, 0, impossible) | "Map not available for this property." No map and **no** directions (they'd go to the wrong place) |
+| Location, but no API key | Grey "Map unavailable…" box + Get Directions (directions don't need a key) |
+| Location and key | The real map + Get Directions |
+
+**Code explained:**
+- `getCoordinates(lat, lng)` in `utils/property.js`: turns `"34.099106000000000"` into `34.099106`; returns `null` for
+  missing, 0, or impossible values. The map is drawn only when it gets real numbers back.
+- `encodeURIComponent(...)`: makes text safe inside a web address (`,` → `%2C`).
+- Get Directions: `https://www.google.com/maps/dir/?api=1&destination=LAT,LNG`
+  - `target="_blank"` → opens in a **new tab**
+  - `rel="noopener noreferrer"` → safety: the new tab can't control our page
+- `referrerPolicy="no-referrer-when-downgrade"` on the iframe: tells Google our page address, so it can check the key is
+  allowed on `localhost:3000`.
+- `loading="lazy"`: the map only loads when you scroll near it.
+
+**The API key:**
+- Lives in `frontend/.env` as `VITE_GOOGLE_MAPS_API_KEY=...`. Vite only hands the page variables that start with `VITE_`
+  (the guide's `REACT_APP_` name is for Create React App, which we don't use). Restart `npm run dev` after changing `.env`.
+- `.env` is ignored by git (checked with `git check-ignore`), so the key is never committed.
+- The key is read in one tiny file, `src/env.js` (`import.meta.env.VITE_GOOGLE_MAPS_API_KEY`). Jest can't read `import.meta`
+  (the same problem as React Router 8 in Step 2), so `jest.config.js` swaps that file for `test/envMock.js` with a fake
+  key `test-key`. The tests never need the real key.
+
+**Tested:**
+- **+10 tests (211 total):** `getCoordinates` (good text, missing, 0, latitude 120); the iframe has the right address with
+  `q=LAT,LNG`, `zoom=15` and the key; no iframe without a location or at 0, 0; no key → grey box but Get Directions still
+  there; Get Directions has the right link, `target="_blank"` and `rel="noopener noreferrer"`; the detail page shows the
+  Location section.
+- **Proof:** with the "no location" check removed, **2 tests failed**; with it back, all pass.
+- In Chrome: grey "Map unavailable" box + Get Directions on the 1st card of page 1 ✅; Get Directions opens Google Maps in a
+  new tab ✅; 1118381441 shows only "Map not available for this property." ✅
+
 ## Problems we hit
 | Problem | Cause | Fix |
 |---|---|---|
@@ -435,7 +486,15 @@ useEffect(() => {
 - **Why `-1` and not `0`?** → `0` would add the dark background as a Tab stop; it only needs focus from our code.
 - **Why does the Back link have an `aria-label`?** → The visible text is short; the label tells screen-reader users where it goes.
 
+- **Why no map at 0, 0?** → 0, 0 is in the ocean off Africa; in this data it means "unknown". Missing or impossible
+  locations (like latitude 120) show "Map not available" instead of a wrong place.
+- **Why `VITE_` and not `REACT_APP_`?** → We use Vite, which only exposes variables starting with `VITE_` to the page.
+- **Why is the key read in a separate `env.js`?** → `import.meta` breaks Jest, so tests swap that one file for a fake key.
+
 ## Still to do / ask
+- Add the real key to `frontend/.env` (`VITE_GOOGLE_MAPS_API_KEY=...`), restart `npm run dev`, and check the real map.
+- **Ask:** some coordinates are wrong but possible (e.g. 1155656736 is in Cyprus; 5 homes share the same middle-of-the-US
+  point). Code can't detect these; the data needs checking.
 - Keyboard ← / → on the gallery itself (not just the lightbox) — possible follow-up using the same `tabIndex` idea.
 - **Ask:** can the photo links be refreshed from the provider? 157 of 552 links on page 1 (28%) are 404.
 - Back from a detail page returns to listings page 1 (page number isn't kept in the address).
